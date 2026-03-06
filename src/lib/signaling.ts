@@ -10,6 +10,7 @@ const SIGNALING_URL = process.env.NEXT_PUBLIC_SIGNALING_URL || "";
 export interface SignalingCallbacks {
     onRoomJoined?: (data: { roomId: string; isHost: boolean; memberCount: number }) => void;
     onRoomFull?: () => void;
+    onRoomNotFound?: (data: { roomId: string }) => void;
     onPartnerJoined?: () => void;
     onPartnerLeft?: () => void;
     onCreateOffer?: () => void;
@@ -44,6 +45,10 @@ export function connectToSignalingServer(
 
     socket.on("room-full", () => {
         callbacks.onRoomFull?.();
+    });
+
+    socket.on("room-not-found", (data) => {
+        callbacks.onRoomNotFound?.(data);
     });
 
     socket.on("partner-joined", () => {

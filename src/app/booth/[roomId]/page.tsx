@@ -226,6 +226,7 @@ export default function BoothRoomPage() {
     const [currentPrompt, setCurrentPrompt] = useState(0);
     const [soloMode, setSoloMode] = useState(false);
     const [roomFull, setRoomFull] = useState(false);
+    const [roomNotFound, setRoomNotFound] = useState(false);
 
     const filter = FILTERS.find((f) => f.id === selectedFilter)!;
     const partnerConnected = connectionStatus === "connected";
@@ -295,6 +296,10 @@ export default function BoothRoomPage() {
             onRoomFull: () => {
                 console.log("[booth] Room is full");
                 setRoomFull(true);
+            },
+            onRoomNotFound: () => {
+                console.log("[booth] Room not found");
+                setRoomNotFound(true);
             },
             onPartnerJoined: () => {
                 console.log("[booth] Partner joined");
@@ -519,6 +524,52 @@ export default function BoothRoomPage() {
     }
 
     // ─── RENDER ─────────────────────────────────────────────────────
+
+    // Room not found state
+    if (roomNotFound) {
+        return (
+            <div className="gradient-hero min-h-screen flex items-center justify-center px-6">
+                <div className="glass-card p-8 max-w-md text-center">
+                    <Camera size={40} className="text-coral mx-auto mb-4" />
+                    <h2 className="text-xl font-bold font-[family-name:var(--font-outfit)] mb-2">
+                        Room Not Found
+                    </h2>
+                    <p className="text-gray-400 text-sm mb-2">
+                        No booth exists with code <span className="font-bold text-pink-light">{roomId}</span>
+                    </p>
+                    <p className="text-gray-500 text-xs mb-6">
+                        Make sure you have the correct room code from your partner.
+                    </p>
+                    <Link href="/booth" className="btn-primary inline-block">
+                        Go Back
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    // Room full state
+    if (roomFull) {
+        return (
+            <div className="gradient-hero min-h-screen flex items-center justify-center px-6">
+                <div className="glass-card p-8 max-w-md text-center">
+                    <Heart size={40} className="text-coral mx-auto mb-4" fill="currentColor" />
+                    <h2 className="text-xl font-bold font-[family-name:var(--font-outfit)] mb-2">
+                        Room is Full
+                    </h2>
+                    <p className="text-gray-400 text-sm mb-2">
+                        Room <span className="font-bold text-pink-light">{roomId}</span> already has 2 people.
+                    </p>
+                    <p className="text-gray-500 text-xs mb-6">
+                        Only 2 people are allowed per booth room.
+                    </p>
+                    <Link href="/booth" className="btn-primary inline-block">
+                        Go Back
+                    </Link>
+                </div>
+            </div>
+        );
+    }
 
     // Camera error state
     if (cameraError) {

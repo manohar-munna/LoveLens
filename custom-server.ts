@@ -1,10 +1,11 @@
 /**
  * LoveLens — Custom Next.js Server with Integrated Socket.IO Signaling
  * Runs both Next.js and the signaling server on the same port.
+ * Also provides API routes for room creation/validation.
  * Run: npx tsx custom-server.ts
  */
 
-import { createServer } from "http";
+import { createServer, IncomingMessage, ServerResponse } from "http";
 import next from "next";
 import { Server, Socket } from "socket.io";
 
@@ -16,10 +17,61 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 // Room state: roomId → Set of socket IDs
+// Only rooms explicitly created via the API will exist here
 const rooms = new Map<string, Set<string>>();
 
+// Track created rooms (rooms that were explicitly created, not auto-joined)
+const createdRooms = new Set<string>();
+
 app.prepare().then(() => {
-    const httpServer = createServer((req, res) => {
+    const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
+        const url = req.url || "";
+
+        // ─── API: Create Room ─────────────────────────────────────
+        if (url === "/api/rooms" && req.method === "POST") {
+            let body = "";
+            req.on("data", (chunk: Buffer) => (body += chunk));
+            req.on("end", () => {
+                try {
+                    const { roomId } = JSON.parse(body);
+                    if (!roomId || typeof roomId !== "string") {
+                        res.writeHead(400, { "Content-Type": "application/json" });
+                        res.end(JSON.stringify({ error: "roomId is required" }));
+                        return;
+                    }
+
+                    // Register the room as created
+                    createdRooms.add(roomId);
+                    if (!rooms.has(roomId)) {
+                        rooms.set(roomId, new Set());
+                    }
+
+                    console.log(`[api] Room created: ${roomId}`);
+                    res.writeHead(200, { "Content-Type": "application/json" });
+                    res.end(JSON.stringify({ roomId, created: true }));
+                } catch {
+                    res.writeHead(400, { "Content-Type": "application/json" });
+                    res.end(JSON.stringify({ error: "Invalid JSON" }));
+                }
+            });
+            return;
+        }
+
+        // ─── API: Check Room ──────────────────────────────────────
+        const checkMatch = url.match(/^\/api\/rooms\/([A-Za-z0-9]+)$/);
+        if (checkMatch && req.method === "GET") {
+            const roomId = checkMatch[1].toUpperCase();
+            const exists = createdRooms.has(roomId);
+            const members = rooms.get(roomId);
+            const memberCount = members ? members.size : 0;
+            const isFull = memberCount >= 2;
+
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ roomId, exists, memberCount, isFull }));
+            return;
+        }
+
+        // ─── All other requests → Next.js ─────────────────────────
         handle(req, res);
     });
 
@@ -38,14 +90,16 @@ app.prepare().then(() => {
         socket.on("join-room", (roomId: string) => {
             if (!roomId || typeof roomId !== "string") return;
 
+            // Check if room was explicitly created
+            if (!createdRooms.has(roomId)) {
+                socket.emit("room-not-found", { roomId });
+                console.log(`[signaling] Room not found: ${roomId} (${socket.id})`);
+                return;
+            }
+
             // If already in a room, leave it first
             if (currentRoom) {
                 leaveRoom(socket, currentRoom);
-            }
-
-            // Create room if it doesn't exist
-            if (!rooms.has(roomId)) {
-                rooms.set(roomId, new Set());
             }
 
             const members = rooms.get(roomId)!;
@@ -127,6 +181,8 @@ app.prepare().then(() => {
                 );
                 if (members.size === 0) {
                     rooms.delete(roomId);
+                    createdRooms.delete(roomId);
+                    console.log(`[signaling] Room ${roomId} destroyed (empty)`);
                 }
             }
             sock.leave(roomId);

@@ -14,9 +14,20 @@ export default function BoothEntryPage() {
     const [copied, setCopied] = useState(false);
     const [joinError, setJoinError] = useState("");
 
-    function handleCreateRoom() {
+    async function handleCreateRoom() {
         const id = generateRoomId();
-        setGeneratedRoomId(id);
+        try {
+            const res = await fetch("/api/rooms", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ roomId: id }),
+            });
+            if (res.ok) {
+                setGeneratedRoomId(id);
+            }
+        } catch {
+            setGeneratedRoomId(id);
+        }
     }
 
     function handleStartBooth() {
@@ -35,14 +46,32 @@ export default function BoothEntryPage() {
         }
     }
 
-    function handleJoinRoom() {
+    async function handleJoinRoom() {
         const code = roomCode.trim().toUpperCase();
         if (code.length < 4) {
             setJoinError("Enter a valid room code");
             return;
         }
         setJoinError("");
-        router.push(`/booth/${code}`);
+
+        try {
+            const res = await fetch(`/api/rooms/${code}`);
+            const data = await res.json();
+
+            if (!data.exists) {
+                setJoinError("Room not found! Check the code and try again.");
+                return;
+            }
+            if (data.isFull) {
+                setJoinError("Room is full (2/2). Only 2 people allowed per room.");
+                return;
+            }
+
+            router.push(`/booth/${code}`);
+        } catch {
+            // If API check fails, try joining anyway
+            router.push(`/booth/${code}`);
+        }
     }
 
     return (

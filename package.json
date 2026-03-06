@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "server": "npx tsx server.ts"
   },
   "dependencies": {
     "framer-motion": "^12.35.0",
@@ -15,7 +16,9 @@
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
+    "tsx": "^4.21.0",
     "uuid": "^13.0.0",
     "zustand": "^5.0.11"
   },

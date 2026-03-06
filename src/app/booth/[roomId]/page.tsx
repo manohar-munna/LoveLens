@@ -16,6 +16,8 @@ import {
     Palette,
     X,
     Image as ImageIcon,
+    Wifi,
+    WifiOff,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -33,6 +35,22 @@ import {
     sharePhotostrip,
 } from "@/lib/canvas";
 import { getRoomUrl, copyToClipboard } from "@/lib/room";
+import {
+    connectToSignalingServer,
+    sendOffer,
+    sendAnswer,
+    sendIceCandidate,
+    disconnectSignaling,
+} from "@/lib/signaling";
+import {
+    createPeerConnection,
+    createOffer as rtcCreateOffer,
+    createAnswer as rtcCreateAnswer,
+    handleOffer as rtcHandleOffer,
+    handleAnswer as rtcHandleAnswer,
+    addIceCandidate as rtcAddIceCandidate,
+    closePeerConnection,
+} from "@/lib/webrtc";
 
 // ─── Countdown Overlay ─────────────────────────────────────────
 function CountdownOverlay({ value }: { value: number }) {
@@ -134,8 +152,8 @@ function FilterCarousel({
                 >
                     <div
                         className={`w-14 h-14 rounded-xl overflow-hidden border-2 transition-all ${selected === f.id
-                                ? "border-pink-primary shadow-lg shadow-pink-primary/30"
-                                : "border-white/10 hover:border-white/20"
+                            ? "border-pink-primary shadow-lg shadow-pink-primary/30"
+                            : "border-white/10 hover:border-white/20"
                             }`}
                     >
                         <div
@@ -179,7 +197,13 @@ export default function BoothRoomPage() {
         showDateStamp,
         borderStyle,
         localStream,
+        remoteStream,
+        connectionStatus,
         setLocalStream,
+        setRemoteStream,
+        setIsHost,
+        setPartnerJoined,
+        setConnectionStatus,
         setPhase,
         setSelectedFilter,
         setCountdownValue,
@@ -201,8 +225,10 @@ export default function BoothRoomPage() {
     const [isExporting, setIsExporting] = useState(false);
     const [currentPrompt, setCurrentPrompt] = useState(0);
     const [soloMode, setSoloMode] = useState(false);
+    const [roomFull, setRoomFull] = useState(false);
 
     const filter = FILTERS.find((f) => f.id === selectedFilter)!;
+    const partnerConnected = connectionStatus === "connected";
 
     // Initialize camera on mount
     useEffect(() => {
@@ -231,6 +257,100 @@ export default function BoothRoomPage() {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // WebRTC + Signaling: connect to partner when local stream is ready
+    useEffect(() => {
+        if (!localStream || !roomId) return;
+
+        setConnectionStatus("connecting");
+
+        // Setup WebRTC peer connection
+        const pc = createPeerConnection(localStream, {
+            onRemoteStream: (stream) => {
+                console.log("[booth] Remote stream received");
+                setRemoteStream(stream);
+                setPartnerJoined(true);
+                setConnectionStatus("connected");
+                setSoloMode(false);
+            },
+            onIceCandidate: (candidate) => {
+                sendIceCandidate(candidate.toJSON());
+            },
+            onConnectionStateChange: (state) => {
+                if (state === "disconnected" || state === "failed" || state === "closed") {
+                    setConnectionStatus("waiting");
+                    setPartnerJoined(false);
+                    setRemoteStream(null);
+                }
+            },
+        });
+
+        // Connect to signaling server
+        const socket = connectToSignalingServer(roomId, {
+            onRoomJoined: (data) => {
+                console.log("[booth] Room joined:", data);
+                setIsHost(data.isHost);
+                setConnectionStatus(data.memberCount < 2 ? "waiting" : "connecting");
+            },
+            onRoomFull: () => {
+                console.log("[booth] Room is full");
+                setRoomFull(true);
+            },
+            onPartnerJoined: () => {
+                console.log("[booth] Partner joined");
+                setPartnerJoined(true);
+            },
+            onCreateOffer: async () => {
+                try {
+                    console.log("[booth] Creating WebRTC offer...");
+                    const offer = await rtcCreateOffer();
+                    sendOffer(offer);
+                } catch (err) {
+                    console.error("[booth] Failed to create offer:", err);
+                }
+            },
+            onOffer: async (data) => {
+                try {
+                    console.log("[booth] Received offer, creating answer...");
+                    await rtcHandleOffer(data.sdp);
+                    const answer = await rtcCreateAnswer();
+                    sendAnswer(answer);
+                } catch (err) {
+                    console.error("[booth] Failed to handle offer:", err);
+                }
+            },
+            onAnswer: async (data) => {
+                try {
+                    console.log("[booth] Received answer");
+                    await rtcHandleAnswer(data.sdp);
+                } catch (err) {
+                    console.error("[booth] Failed to handle answer:", err);
+                }
+            },
+            onIceCandidate: async (data) => {
+                try {
+                    await rtcAddIceCandidate(data.candidate);
+                } catch (err) {
+                    console.error("[booth] Failed to add ICE candidate:", err);
+                }
+            },
+            onPartnerLeft: () => {
+                console.log("[booth] Partner left");
+                setPartnerJoined(false);
+                setRemoteStream(null);
+                setConnectionStatus("waiting");
+            },
+        });
+
+        return () => {
+            closePeerConnection();
+            disconnectSignaling();
+            setConnectionStatus("disconnected");
+            setPartnerJoined(false);
+            setRemoteStream(null);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [localStream, roomId]);
 
     // Cleanup stream on unmount
     useEffect(() => {
@@ -287,12 +407,15 @@ export default function BoothRoomPage() {
             ? captureFrame(localVideoRef.current, filter.cssFilter)
             : null;
 
-        // In solo mode, capture local twice (mirrored); otherwise we'd capture remote
-        const remoteResult = soloMode
-            ? localResult
-            : localVideoRef.current
-                ? captureFrame(localVideoRef.current, filter.cssFilter)
-                : null;
+        // Capture remote video if partner is connected, otherwise use local (solo)
+        let remoteResult = null;
+        if (partnerConnected && remoteVideoRef.current) {
+            remoteResult = captureFrame(remoteVideoRef.current, filter.cssFilter);
+        } else if (soloMode && localVideoRef.current) {
+            remoteResult = captureFrame(localVideoRef.current, filter.cssFilter);
+        } else if (localVideoRef.current) {
+            remoteResult = captureFrame(localVideoRef.current, filter.cssFilter);
+        }
 
         if (localResult && remoteResult) {
             const newCapture: CapturedFrame = {
@@ -433,6 +556,11 @@ export default function BoothRoomPage() {
                     <div className="glass rounded-lg px-3 py-1.5 text-xs font-mono tracking-wider text-gray-300">
                         Room: {roomId}
                     </div>
+                    <div className={`glass rounded-lg px-3 py-1.5 text-xs flex items-center gap-1.5 ${partnerConnected ? 'text-mint' : connectionStatus === 'waiting' ? 'text-yellow-400' : 'text-gray-400'
+                        }`}>
+                        {partnerConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
+                        {partnerConnected ? 'Connected' : connectionStatus === 'waiting' ? 'Waiting...' : 'Connecting...'}
+                    </div>
                     <button
                         onClick={handleCopyLink}
                         className="glass rounded-lg px-3 py-1.5 text-xs flex items-center gap-1 hover:border-pink-primary/30 transition-colors"
@@ -480,10 +608,10 @@ export default function BoothRoomPage() {
                                             <div
                                                 key={i}
                                                 className={`w-3 h-3 rounded-full transition-all duration-300 ${i < captureIndex
-                                                        ? "bg-pink-primary scale-100"
-                                                        : i === captureIndex
-                                                            ? "bg-pink-primary animate-pulse scale-125"
-                                                            : "bg-white/20"
+                                                    ? "bg-pink-primary scale-100"
+                                                    : i === captureIndex
+                                                        ? "bg-pink-primary animate-pulse scale-125"
+                                                        : "bg-white/20"
                                                     }`}
                                             />
                                         ))}
@@ -507,19 +635,19 @@ export default function BoothRoomPage() {
 
                                     <div className="relative">
                                         <CameraFeed
-                                            stream={soloMode ? localStream : null}
+                                            stream={partnerConnected ? remoteStream : (soloMode ? localStream : null)}
                                             filter={filter.cssFilter}
-                                            label={soloMode ? "You (mirrored)" : "Partner 💝"}
+                                            label={partnerConnected ? "Partner 💝" : (soloMode ? "You (mirrored)" : "Partner 💝")}
                                             videoRef={remoteVideoRef}
-                                            mirrored={!soloMode}
+                                            mirrored={!partnerConnected && !soloMode}
                                         />
                                         {phase === "countdown" && (
                                             <CountdownOverlay value={countdownValue} />
                                         )}
                                         {showFlash && <FlashOverlay />}
 
-                                        {/* Partner not connected — solo mode toggle */}
-                                        {!soloMode && (
+                                        {/* Partner not connected and not in solo mode — show waiting overlay */}
+                                        {!partnerConnected && !soloMode && (
                                             <div className="absolute inset-0 flex items-center justify-center bg-charcoal/80 rounded-xl">
                                                 <div className="text-center p-4">
                                                     <Heart
@@ -527,15 +655,26 @@ export default function BoothRoomPage() {
                                                         className="text-pink-primary mx-auto mb-3 animate-pulse"
                                                         fill="currentColor"
                                                     />
-                                                    <p className="text-sm text-gray-400 mb-3">
-                                                        Waiting for your partner...
+                                                    <p className="text-sm text-gray-400 mb-2">
+                                                        {roomFull
+                                                            ? "Room is full (2/2)"
+                                                            : connectionStatus === "waiting"
+                                                                ? "Waiting for your partner..."
+                                                                : "Connecting to room..."}
                                                     </p>
-                                                    <button
-                                                        onClick={() => setSoloMode(true)}
-                                                        className="btn-secondary text-xs"
-                                                    >
-                                                        Try Solo Mode
-                                                    </button>
+                                                    {!roomFull && (
+                                                        <>
+                                                            <p className="text-xs text-gray-500 mb-3">
+                                                                Share the room code: <span className="font-bold text-pink-light">{roomId}</span>
+                                                            </p>
+                                                            <button
+                                                                onClick={() => setSoloMode(true)}
+                                                                className="btn-secondary text-xs"
+                                                            >
+                                                                Try Solo Mode
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
@@ -679,14 +818,14 @@ export default function BoothRoomPage() {
                                             <button
                                                 onClick={() => setShowDateStamp(!showDateStamp)}
                                                 className={`w-12 h-6 rounded-full transition-all duration-200 ${showDateStamp
-                                                        ? "bg-pink-primary"
-                                                        : "bg-white/10"
+                                                    ? "bg-pink-primary"
+                                                    : "bg-white/10"
                                                     }`}
                                             >
                                                 <div
                                                     className={`w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${showDateStamp
-                                                            ? "translate-x-6"
-                                                            : "translate-x-0.5"
+                                                        ? "translate-x-6"
+                                                        : "translate-x-0.5"
                                                         }`}
                                                 />
                                             </button>
@@ -706,8 +845,8 @@ export default function BoothRoomPage() {
                                                         key={style}
                                                         onClick={() => setBorderStyle(style)}
                                                         className={`w-10 h-10 rounded-lg border-2 transition-all ${borderStyle === style
-                                                                ? "border-pink-primary scale-110 shadow-lg"
-                                                                : "border-white/10 hover:border-white/30"
+                                                            ? "border-pink-primary scale-110 shadow-lg"
+                                                            : "border-white/10 hover:border-white/30"
                                                             }`}
                                                         style={{
                                                             backgroundColor:

@@ -86,11 +86,14 @@ export interface CapturedFrame {
     remoteUrl?: string;
 }
 
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'waiting' | 'connected';
+
 interface BoothStore {
     // Room
     roomId: string | null;
     isHost: boolean;
     partnerJoined: boolean;
+    connectionStatus: ConnectionStatus;
 
     // Camera
     localStream: MediaStream | null;
@@ -112,6 +115,7 @@ interface BoothStore {
     setRoomId: (id: string | null) => void;
     setIsHost: (isHost: boolean) => void;
     setPartnerJoined: (joined: boolean) => void;
+    setConnectionStatus: (status: ConnectionStatus) => void;
     setLocalStream: (stream: MediaStream | null) => void;
     setRemoteStream: (stream: MediaStream | null) => void;
     setPhase: (phase: BoothPhase) => void;
@@ -129,6 +133,7 @@ export const useBoothStore = create<BoothStore>((set) => ({
     roomId: null,
     isHost: false,
     partnerJoined: false,
+    connectionStatus: 'disconnected',
     localStream: null,
     remoteStream: null,
     phase: "waiting",
@@ -143,6 +148,7 @@ export const useBoothStore = create<BoothStore>((set) => ({
     setRoomId: (id) => set({ roomId: id }),
     setIsHost: (isHost) => set({ isHost }),
     setPartnerJoined: (joined) => set({ partnerJoined: joined }),
+    setConnectionStatus: (status) => set({ connectionStatus: status }),
     setLocalStream: (stream) => set({ localStream: stream }),
     setRemoteStream: (stream) => set({ remoteStream: stream }),
     setPhase: (phase) => set({ phase }),

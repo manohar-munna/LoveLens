@@ -231,6 +231,9 @@ export default function BoothRoomPage() {
     const [roomFull, setRoomFull] = useState(false);
     const [roomNotFound, setRoomNotFound] = useState(false);
 
+    // Queue for photo taken events that arrive before local addCapture()
+    const remotePhotoQueue = useRef<Record<number, string>>({});
+
     const filter = FILTERS.find((f) => f.id === selectedFilter)!;
     const partnerConnected = connectionStatus === "connected";
 
@@ -356,13 +359,18 @@ export default function BoothRoomPage() {
                     runCountdown(0);
                 } else if (data.type === "PHOTO_TAKEN") {
                     const store = useBoothStore.getState();
-                    // data.captureIndex, data.url
-                    setCaptures(store.captures.map((c, i) => {
-                        if (i === data.captureIndex) {
-                            return { ...c, remoteUrl: data.url };
-                        }
-                        return c;
-                    }));
+                    const existingCapture = store.captures[data.captureIndex];
+                    if (existingCapture) {
+                        setCaptures(store.captures.map((c, i) => {
+                            if (i === data.captureIndex) {
+                                return { ...c, remoteUrl: data.url };
+                            }
+                            return c;
+                        }));
+                    } else {
+                        // We received photo before local capture finished! Queue it.
+                        remotePhotoQueue.current[data.captureIndex] = data.url;
+                    }
                 } else if (data.type === "FILTER_CHANGE") {
                     setSelectedFilter(data.filterId);
                 } else if (data.type === "RESET") {
@@ -441,40 +449,29 @@ export default function BoothRoomPage() {
         setShowFlash(true);
         setTimeout(() => setShowFlash(false), 300);
 
-        // Capture local video
+        // ALWAYS capture only local video for maximum quality
         const localResult = localVideoRef.current
             ? captureFrame(localVideoRef.current, filter.cssFilter)
             : null;
 
-        // Capture remote video if partner is connected, otherwise use local (solo)
-        let remoteResult = null;
-        if (partnerConnected && remoteVideoRef.current) {
-            remoteResult = captureFrame(remoteVideoRef.current, filter.cssFilter);
-        } else if (soloMode && localVideoRef.current) {
-            remoteResult = captureFrame(localVideoRef.current, filter.cssFilter);
-        } else if (localVideoRef.current) {
-            remoteResult = captureFrame(localVideoRef.current, filter.cssFilter);
-        }
+        if (localResult) {
+            // Check if partner already sent their photo
+            const queuedRemoteUrl = remotePhotoQueue.current[captureIdx];
+            if (queuedRemoteUrl) {
+                delete remotePhotoQueue.current[captureIdx];
+            }
 
-        if (localResult && remoteResult) {
-            // we have both already (solo mode, or we just snapped both feeds from WebRTC streams locally)
             const newCapture: CapturedFrame = {
                 localBlob: undefined as unknown as Blob,
                 localUrl: localResult.url,
                 remoteBlob: undefined as unknown as Blob,
-                remoteUrl: remoteResult.url,
+                remoteUrl: soloMode ? localResult.url : (queuedRemoteUrl || ""), // fallback if missing
             };
+
             addCapture(newCapture);
-        } else if (localResult) {
-            // Partner connected but remote capture failed locally or we only want local feed explicitly for network send
-            const newCapture: CapturedFrame = {
-                localBlob: undefined as unknown as Blob,
-                localUrl: localResult.url,
-                remoteBlob: undefined as unknown as Blob,
-                remoteUrl: localResult.url, // fallback until partner sends
-            };
-            addCapture(newCapture);
+
             if (partnerConnected) {
+                // Instantly send our high quality local capture to partner
                 sendSyncEvent({ type: "PHOTO_TAKEN", captureIndex: captureIdx, url: localResult.url });
             }
         }
@@ -864,7 +861,7 @@ export default function BoothRoomPage() {
                                                         <img
                                                             src={c.localUrl}
                                                             alt={`Capture ${i + 1} - You`}
-                                                            className="w-1/2 aspect-[4/3] rounded-lg object-cover"
+                                                            className="w-1/2 aspect-[4/3] rounded-l-lg object-cover"
                                                             style={{
                                                                 filter:
                                                                     filter.cssFilter !== "none"
@@ -875,7 +872,7 @@ export default function BoothRoomPage() {
                                                         <img
                                                             src={c.remoteUrl || c.localUrl}
                                                             alt={`Capture ${i + 1} - Partner`}
-                                                            className="w-1/2 aspect-[4/3] rounded-lg object-cover"
+                                                            className="w-1/2 aspect-[4/3] rounded-r-lg object-cover"
                                                             style={{
                                                                 filter:
                                                                     filter.cssFilter !== "none"

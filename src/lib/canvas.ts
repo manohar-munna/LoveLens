@@ -39,12 +39,10 @@ export async function composePhotostrip(
     const filter = FILTERS.find((f) => f.id === filterId);
 
     const STRIP_WIDTH = 1200;
-    const FRAME_WIDTH = 520;
-    const FRAME_HEIGHT = 390;
-    const PADDING = 16;
+    const FRAME_HEIGHT = 440; // 4:3 ratio for each person (560x440)
     const BORDER = 40;
     const GAP = 16;
-    const FOOTER_HEIGHT = 70;
+    const FOOTER_HEIGHT = 80;
 
     const totalHeight =
         BORDER * 2 +
@@ -81,39 +79,32 @@ export async function composePhotostrip(
 
         try {
             const localImg = await loadImage(captures[i].localUrl);
-            const remoteImg = await loadImage(captures[i].remoteUrl);
+            const remoteImg = captures[i].remoteUrl ? await loadImage(captures[i].remoteUrl) : localImg;
 
-            const halfWidth = (innerWidth - PADDING) / 2;
+            const halfWidth = innerWidth / 2;
 
-            // Draw rounded frame backgrounds
+            // Draw ONE combined rounded frame background to clip both images
             ctx.save();
-            roundedRect(ctx, BORDER, yOffset, halfWidth, FRAME_HEIGHT, 12);
+            roundedRect(ctx, BORDER, yOffset, innerWidth, FRAME_HEIGHT, 16);
             ctx.clip();
-            ctx.drawImage(localImg, BORDER, yOffset, halfWidth, FRAME_HEIGHT);
-            ctx.restore();
 
-            ctx.save();
-            roundedRect(
-                ctx,
-                BORDER + halfWidth + PADDING,
-                yOffset,
-                halfWidth,
-                FRAME_HEIGHT,
-                12
-            );
-            ctx.clip();
-            ctx.drawImage(
-                remoteImg,
-                BORDER + halfWidth + PADDING,
-                yOffset,
-                halfWidth,
-                FRAME_HEIGHT
-            );
+            // Draw left image (local)
+            drawImageCenter(ctx, localImg, BORDER, yOffset, halfWidth, FRAME_HEIGHT);
+
+            // Draw right image (remote)
+            drawImageCenter(ctx, remoteImg, BORDER + halfWidth, yOffset, halfWidth, FRAME_HEIGHT);
+
+            // subtle separator line in the middle
+            if (borderStyle !== "black") {
+                ctx.fillStyle = "rgba(0,0,0,0.1)";
+                ctx.fillRect(BORDER + halfWidth, yOffset, 1, FRAME_HEIGHT);
+            }
+
             ctx.restore();
         } catch {
             // If image fails, draw placeholder
             ctx.fillStyle = "rgba(255, 107, 157, 0.1)";
-            ctx.fillRect(BORDER, yOffset, (STRIP_WIDTH - BORDER * 2) / 2, FRAME_HEIGHT);
+            ctx.fillRect(BORDER, yOffset, STRIP_WIDTH - BORDER * 2, FRAME_HEIGHT);
         }
     }
 
@@ -173,6 +164,34 @@ function roundedRect(
     ctx.lineTo(x, y + radius);
     ctx.quadraticCurveTo(x, y, x + radius, y);
     ctx.closePath();
+}
+
+function drawImageCenter(
+    ctx: CanvasRenderingContext2D,
+    img: HTMLImageElement,
+    x: number,
+    y: number,
+    w: number,
+    h: number
+) {
+    const imgRatio = img.width / img.height;
+    const targetRatio = w / h;
+    let sx = 0,
+        sy = 0,
+        sw = img.width,
+        sh = img.height;
+
+    if (imgRatio > targetRatio) {
+        // Image is wider than target area (crop left/right)
+        sw = img.height * targetRatio;
+        sx = (img.width - sw) / 2;
+    } else {
+        // Image is taller than target area (crop top/bottom)
+        sh = img.width / targetRatio;
+        sy = (img.height - sh) / 2;
+    }
+
+    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
 }
 
 export function canvasToBlob(

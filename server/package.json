@@ -4,6 +4,7 @@
     "private": true,
     "scripts": {
         "start": "npx tsx index.ts",
+        "build": "echo \"No build step needed\"",
         "dev": "npx tsx --watch index.ts"
     },
     "dependencies": {

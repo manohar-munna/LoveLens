@@ -228,6 +228,8 @@ export default function BoothRoomPage() {
     const [isExporting, setIsExporting] = useState(false);
     const [currentPrompt, setCurrentPrompt] = useState(0);
     const [soloMode, setSoloMode] = useState(false);
+    const soloModeRef = useRef(soloMode);
+    useEffect(() => { soloModeRef.current = soloMode; }, [soloMode]);
     const [roomFull, setRoomFull] = useState(false);
     const [roomNotFound, setRoomNotFound] = useState(false);
 
@@ -448,9 +450,15 @@ export default function BoothRoomPage() {
         setShowFlash(true);
         setTimeout(() => setShowFlash(false), 300);
 
+        // Fetch latest state to avoid stale closures
+        const state = useBoothStore.getState();
+        const currentFilter = FILTERS.find((f) => f.id === state.selectedFilter)!;
+        const isPartnerConnected = state.connectionStatus === "connected";
+        const isSoloMode = soloModeRef.current;
+
         // ALWAYS capture only local video for maximum quality
         const localResult = localVideoRef.current
-            ? captureFrame(localVideoRef.current, filter.cssFilter)
+            ? captureFrame(localVideoRef.current, currentFilter.cssFilter)
             : null;
 
         if (localResult) {
@@ -464,12 +472,12 @@ export default function BoothRoomPage() {
                 localBlob: undefined as unknown as Blob,
                 localUrl: localResult.url,
                 remoteBlob: undefined as unknown as Blob,
-                remoteUrl: soloMode ? localResult.url : (queuedRemoteUrl || ""), // fallback if missing
+                remoteUrl: isSoloMode ? localResult.url : (queuedRemoteUrl || ""), // fallback if missing
             };
 
             addCapture(newCapture);
 
-            if (partnerConnected) {
+            if (isPartnerConnected) {
                 // Instantly send our high quality local capture to partner
                 sendSyncEvent({ type: "PHOTO_TAKEN", captureIndex: captureIdx, url: localResult.url });
             }

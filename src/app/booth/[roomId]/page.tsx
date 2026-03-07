@@ -18,12 +18,14 @@ import {
     Image as ImageIcon,
     Wifi,
     WifiOff,
+    ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
     useBoothStore,
     FILTERS,
+    TEMPLATES,
     type FilterId,
     type CapturedFrame,
 } from "@/stores/booth-store";
@@ -90,12 +92,14 @@ function CameraFeed({
     filter,
     label,
     mirrored = true,
+    templateEmoji,
     videoRef,
 }: {
     stream: MediaStream | null;
     filter: string;
     label: string;
     mirrored?: boolean;
+    templateEmoji?: string;
     videoRef?: React.RefObject<HTMLVideoElement | null>;
 }) {
     const internalRef = useRef<HTMLVideoElement>(null);
@@ -129,6 +133,13 @@ function CameraFeed({
                         <Camera size={32} className="text-gray-500 mx-auto mb-2" />
                         <p className="text-sm text-gray-500">Waiting for camera...</p>
                     </div>
+                </div>
+            )}
+            {templateEmoji && (
+                <div className="absolute top-8 left-0 right-0 flex justify-center pointer-events-none z-10 w-full">
+                    <span className="text-6xl md:text-8xl drop-shadow-xl select-none" style={{
+                        WebkitTextStroke: "1px rgba(255,255,255,0.3)"
+                    }}>{templateEmoji}</span>
                 </div>
             )}
         </div>
@@ -176,6 +187,40 @@ function FilterCarousel({
     );
 }
 
+// ─── Template Carousel ──────────────────────────────────────────
+function TemplateCarousel({
+    selected,
+    onSelect,
+}: {
+    selected: string;
+    onSelect: (id: any) => void;
+}) {
+    return (
+        <div className="flex gap-3 overflow-x-auto pb-2 px-1 no-scrollbar mt-4 sm:mt-0 xl:mt-0">
+            {TEMPLATES.map((t) => (
+                <button
+                    key={t.id}
+                    onClick={() => onSelect(t.id)}
+                    className={`flex flex-col items-center gap-1 shrink-0 transition-all duration-200 ${selected === t.id ? "scale-110" : "opacity-60 hover:opacity-80"
+                        }`}
+                >
+                    <div
+                        className={`w-14 h-14 rounded-xl overflow-hidden border-2 transition-all flex items-center justify-center bg-charcoal ${selected === t.id
+                            ? "border-pink-primary shadow-lg shadow-pink-primary/30"
+                            : "border-white/10 hover:border-white/20"
+                            }`}
+                    >
+                        <span className="text-2xl">{t.emoji || "🚫"}</span>
+                    </div>
+                    <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                        {t.name}
+                    </span>
+                </button>
+            ))}
+        </div>
+    );
+}
+
 // ─── Capture Prompts ────────────────────────────────────────────
 const CAPTURE_PROMPTS = [
     "Smile at each other! 😊",
@@ -192,6 +237,7 @@ export default function BoothRoomPage() {
     const {
         phase,
         selectedFilter,
+        selectedTemplate,
         countdownValue,
         captures,
         captureIndex,
@@ -208,6 +254,7 @@ export default function BoothRoomPage() {
         setConnectionStatus,
         setPhase,
         setSelectedFilter,
+        setSelectedTemplate,
         setCountdownValue,
         addCapture,
         setCaptureIndex,
@@ -240,6 +287,7 @@ export default function BoothRoomPage() {
     const remotePhotoQueue = useRef<Record<number, string>>({});
 
     const filter = FILTERS.find((f) => f.id === selectedFilter)!;
+    const template = TEMPLATES.find((t) => t.id === selectedTemplate)!;
     const partnerConnected = connectionStatus === "connected";
 
     // Initialize camera on mount
@@ -377,12 +425,16 @@ export default function BoothRoomPage() {
                     });
                 } else if (data.type === "FILTER_CHANGE") {
                     setSelectedFilter(data.filterId);
+                } else if (data.type === "TEMPLATE_CHANGE") {
+                    setSelectedTemplate(data.filterId as any);
                 } else if (data.type === "RESET") {
                     executeReset();
                 } else if (data.type === "RETAKE_REQUEST") {
                     useBoothStore.getState().setRetakeRequest(true);
                 } else if (data.type === "RETAKE_ACCEPT") {
                     executeReset();
+                } else if (data.type === "CAPTURE_COUNT_CHANGE") {
+                    useBoothStore.getState().setMaxCaptures(data.count);
                 }
             }
         });
@@ -397,11 +449,42 @@ export default function BoothRoomPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [localStream, roomId]);
 
-    // Cleanup stream on unmount
+    // Cleanup stream on unmount or when transitioning to review phase
+    useEffect(() => {
+        let mounted = true;
+
+        async function handlePhaseChange() {
+            if (phase === "review" || phase === "customizing" || phase === "exporting") {
+                if (localStream) {
+                    stopStream(localStream);
+                    setLocalStream(null);
+                }
+            } else if (phase === "preview" && !localStream) {
+                // Restart camera if we go back to preview (e.g. Retake)
+                try {
+                    const stream = await initCamera();
+                    if (mounted) {
+                        setLocalStream(stream);
+                    }
+                } catch (err) {
+                    // Ignore on unmount
+                }
+            }
+        }
+
+        handlePhaseChange();
+
+        return () => {
+            mounted = false;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase]);
+
+    // Cleanup strictly on unmount
     useEffect(() => {
         return () => {
-            stopStream(localStream);
-        };
+            if (localStream) stopStream(localStream);
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -430,6 +513,13 @@ export default function BoothRoomPage() {
         setSelectedFilter(fid);
         if (partnerConnected) {
             sendSyncEvent({ type: "FILTER_CHANGE", filterId: fid });
+        }
+    };
+
+    const handleTemplateSelect = (tid: any) => {
+        setSelectedTemplate(tid);
+        if (partnerConnected) {
+            sendSyncEvent({ type: "TEMPLATE_CHANGE", filterId: tid });
         }
     };
 
@@ -493,7 +583,7 @@ export default function BoothRoomPage() {
         const nextIdx = captureIdx + 1;
         setCaptureIndex(nextIdx);
 
-        if (nextIdx < 4) {
+        if (nextIdx < state.maxCaptures) {
             // Short pause then next countdown
             setTimeout(() => {
                 setPhase("countdown");
@@ -535,6 +625,7 @@ export default function BoothRoomPage() {
                 caption,
                 showDateStamp,
                 borderStyle,
+                selectedTemplate: useBoothStore.getState().selectedTemplate,
             });
 
             setStripCanvas(canvas);
@@ -546,7 +637,7 @@ export default function BoothRoomPage() {
 
     // Re-generate when customization changes
     useEffect(() => {
-        if (phase === "customizing" && captures.length === 4) {
+        if (phase === "customizing" && captures.length === useBoothStore.getState().maxCaptures) {
             generateStrip();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -692,12 +783,17 @@ export default function BoothRoomPage() {
         <div className="gradient-hero min-h-screen flex flex-col">
             {/* Top bar */}
             <div className="flex items-center justify-between px-4 md:px-8 py-3 border-b border-white/5">
-                <Link href="/booth" className="flex items-center gap-2">
-                    <Heart size={20} className="text-pink-primary" fill="currentColor" />
-                    <span className="text-sm font-bold font-[family-name:var(--font-outfit)] gradient-text">
-                        LoveLens
-                    </span>
-                </Link>
+                <div className="flex items-center gap-4">
+                    <button onClick={() => window.location.href = '/booth'} className="text-gray-400 hover:text-white transition-colors" title="Leave Room">
+                        <ArrowLeft size={18} />
+                    </button>
+                    <Link href="/booth" className="flex items-center gap-2">
+                        <Heart size={20} className="text-pink-primary" fill="currentColor" />
+                        <span className="text-sm font-bold font-[family-name:var(--font-outfit)] gradient-text hidden sm:inline">
+                            LoveLens
+                        </span>
+                    </Link>
+                </div>
 
                 <div className="flex items-center gap-2 sm:gap-3">
                     <div className="glass rounded-lg px-2 sm:px-3 py-1.5 text-xs font-mono tracking-wider hidden sm:block" style={{ color: 'var(--text-secondary)' }}>
@@ -752,7 +848,7 @@ export default function BoothRoomPage() {
                                 {/* Progress dots */}
                                 {(phase === "countdown" || phase === "capturing") && (
                                     <div className="flex justify-center gap-2 mb-4">
-                                        {[0, 1, 2, 3].map((i) => (
+                                        {Array.from({ length: useBoothStore.getState().maxCaptures }).map((_, i) => (
                                             <div
                                                 key={i}
                                                 className={`w-3 h-3 rounded-full transition-all duration-300 ${i < captureIndex
@@ -774,6 +870,7 @@ export default function BoothRoomPage() {
                                             filter={filter.cssFilter}
                                             label="You 💕"
                                             videoRef={localVideoRef}
+                                            templateEmoji={template?.emoji}
                                         />
                                         {phase === "countdown" && (
                                             <CountdownOverlay value={countdownValue} />
@@ -788,6 +885,7 @@ export default function BoothRoomPage() {
                                             label={partnerConnected ? "Partner 💝" : (soloMode ? "You (mirrored)" : "Partner 💝")}
                                             videoRef={remoteVideoRef}
                                             mirrored={!partnerConnected && !soloMode}
+                                            templateEmoji={template?.emoji}
                                         />
                                         {phase === "countdown" && (
                                             <CountdownOverlay value={countdownValue} />
@@ -831,10 +929,32 @@ export default function BoothRoomPage() {
 
                                 {/* Filter carousel */}
                                 <div className="mt-5">
-                                    <FilterCarousel
-                                        selected={selectedFilter}
-                                        onSelect={handleFilterSelect}
-                                    />
+                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                                        <FilterCarousel
+                                            selected={selectedFilter}
+                                            onSelect={handleFilterSelect}
+                                        />
+
+                                        {/* Capture Count Selector */}
+                                        <div className="glass px-3 py-1.5 rounded-xl border border-white/5 flex items-center gap-2">
+                                            <label className="text-xs text-gray-400 whitespace-nowrap">Photos:</label>
+                                            <select
+                                                value={useBoothStore.getState().maxCaptures}
+                                                onChange={(e) => {
+                                                    const count = Number(e.target.value);
+                                                    useBoothStore.getState().setMaxCaptures(count);
+                                                    if (partnerConnected) {
+                                                        sendSyncEvent({ type: "CAPTURE_COUNT_CHANGE", count });
+                                                    }
+                                                }}
+                                                className="bg-transparent text-sm text-pink-light font-bold outline-none cursor-pointer"
+                                            >
+                                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                                                    <option key={num} value={num} className="bg-charcoal text-white">{num}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Capture button */}
@@ -848,7 +968,7 @@ export default function BoothRoomPage() {
                                             disabled={!localStream}
                                         >
                                             <Camera size={20} />
-                                            Take Photos (4 shots)
+                                            Take Photos ({useBoothStore.getState().maxCaptures} shots)
                                         </motion.button>
                                     </div>
                                 )}

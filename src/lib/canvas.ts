@@ -11,6 +11,7 @@ interface ComposeOptions {
     caption: string;
     showDateStamp: boolean;
     borderStyle: "white" | "pink" | "black" | "polaroid";
+    selectedTemplate: "none" | "hearts" | "stars" | "crown";
 }
 
 const BORDER_COLORS: Record<string, string> = {
@@ -35,7 +36,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 export async function composePhotostrip(
     options: ComposeOptions
 ): Promise<HTMLCanvasElement> {
-    const { captures, filterId, caption, showDateStamp, borderStyle } = options;
+    const { captures, filterId, caption, showDateStamp, borderStyle, selectedTemplate } = options;
     const filter = FILTERS.find((f) => f.id === filterId);
 
     const STRIP_WIDTH = 1200;
@@ -96,6 +97,23 @@ export async function composePhotostrip(
                 drawImageCenter(ctx, remoteImg, BORDER + halfWidth, yOffset, halfWidth, FRAME_HEIGHT);
             } else {
                 drawImageCenter(ctx, localImg, BORDER + halfWidth, yOffset, halfWidth, FRAME_HEIGHT);
+            }
+
+            // Draw sticker template if selected
+            if (selectedTemplate !== "none") {
+                const drawSticker = (emoji: string) => {
+                    ctx.font = "80px sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    // Draw on local side (top middle)
+                    ctx.fillText(emoji, BORDER + halfWidth / 2, yOffset + 80);
+                    // Draw on remote side (top middle)
+                    ctx.fillText(emoji, BORDER + halfWidth + halfWidth / 2, yOffset + 80);
+                }
+
+                if (selectedTemplate === "hearts") drawSticker("💖");
+                if (selectedTemplate === "stars") drawSticker("✨");
+                if (selectedTemplate === "crown") drawSticker("👑");
             }
 
             // subtle separator line in the middle

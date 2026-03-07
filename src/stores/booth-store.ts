@@ -79,6 +79,21 @@ export type BoothPhase =
     | "customizing"
     | "exporting";
 
+export type TemplateId = "none" | "hearts" | "stars" | "crown";
+
+export interface TemplateDef {
+    id: TemplateId;
+    name: string;
+    emoji: string;
+}
+
+export const TEMPLATES: TemplateDef[] = [
+    { id: "none", name: "No Sticker", emoji: "" },
+    { id: "hearts", name: "Hearts Crown", emoji: "💖" },
+    { id: "stars", name: "Star Magic", emoji: "✨" },
+    { id: "crown", name: "Royal Crown", emoji: "👑" },
+];
+
 export interface CapturedFrame {
     localBlob: Blob;
     localUrl: string;
@@ -105,11 +120,13 @@ interface BoothStore {
     countdownValue: number;
     captureIndex: number;
     captures: CapturedFrame[];
+    maxCaptures: number;
 
     // Customization
     caption: string;
     showDateStamp: boolean;
     borderStyle: "white" | "pink" | "black" | "polaroid";
+    selectedTemplate: TemplateId;
 
     // Retake request
     retakeRequest: boolean;
@@ -127,9 +144,11 @@ interface BoothStore {
     addCapture: (capture: CapturedFrame) => void;
     setCaptureIndex: (index: number) => void;
     setCaptures: (captures: CapturedFrame[] | ((prev: CapturedFrame[]) => CapturedFrame[])) => void;
+    setMaxCaptures: (count: number) => void;
     setCaption: (caption: string) => void;
     setShowDateStamp: (show: boolean) => void;
     setBorderStyle: (style: "white" | "pink" | "black" | "polaroid") => void;
+    setSelectedTemplate: (template: TemplateId) => void;
     setRetakeRequest: (request: boolean) => void;
     resetBooth: () => void;
 }
@@ -146,9 +165,11 @@ export const useBoothStore = create<BoothStore>((set) => ({
     countdownValue: 3,
     captureIndex: 0,
     captures: [],
+    maxCaptures: 3,
     caption: "",
     showDateStamp: true,
     borderStyle: "white",
+    selectedTemplate: "none",
     retakeRequest: false,
 
     setRoomId: (id) => set({ roomId: id }),
@@ -169,9 +190,11 @@ export const useBoothStore = create<BoothStore>((set) => ({
                 ? updaterOrValue(state.captures)
                 : updaterOrValue
         })),
+    setMaxCaptures: (count) => set({ maxCaptures: count }),
     setCaption: (caption) => set({ caption }),
     setShowDateStamp: (show) => set({ showDateStamp: show }),
     setBorderStyle: (style) => set({ borderStyle: style }),
+    setSelectedTemplate: (template) => set({ selectedTemplate: template }),
     setRetakeRequest: (request) => set({ retakeRequest: request }),
     resetBooth: () =>
         set({

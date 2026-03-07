@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Heart, Camera, Link2, Copy, Check, ArrowRight, Loader2, Share2 } from "lucide-react";
+import { Heart, Camera, Copy, Check, Share2, Loader2, ArrowLeft, ArrowRight, Link2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { generateRoomId, getRoomUrl, copyToClipboard } from "@/lib/room";
 import { SIGNALING_URL } from "@/lib/signaling";
@@ -101,12 +101,17 @@ export default function BoothEntryPage() {
         <div className="gradient-hero min-h-screen">
             {/* Nav */}
             <nav className="flex items-center justify-between px-4 sm:px-6 md:px-12 py-5">
-                <Link href="/" className="flex items-center gap-2">
-                    <Heart size={24} className="text-pink-primary" fill="currentColor" />
-                    <span className="text-lg font-bold font-[family-name:var(--font-outfit)] gradient-text">
-                        LoveLens
-                    </span>
-                </Link>
+                <div className="flex items-center gap-4">
+                    <Link href="/" className="text-gray-400 hover:text-white transition-colors" title="Back to Home">
+                        <ArrowLeft size={18} />
+                    </Link>
+                    <Link href="/" className="flex items-center gap-2">
+                        <Heart size={24} className="text-pink-primary" fill="currentColor" />
+                        <span className="text-lg font-bold font-[family-name:var(--font-outfit)] gradient-text hidden sm:inline">
+                            LoveLens
+                        </span>
+                    </Link>
+                </div>
                 <ThemeToggle />
             </nav>
 

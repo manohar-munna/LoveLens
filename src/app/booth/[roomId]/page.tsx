@@ -40,6 +40,7 @@ import {
     sendOffer,
     sendAnswer,
     sendIceCandidate,
+    sendSyncEvent,
     disconnectSignaling,
 } from "@/lib/signaling";
 import {
@@ -214,6 +215,7 @@ export default function BoothRoomPage() {
         setShowDateStamp,
         setBorderStyle,
         resetBooth,
+        setCaptures,
     } = useBoothStore();
 
     const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -346,6 +348,27 @@ export default function BoothRoomPage() {
                 setRemoteStream(null);
                 setConnectionStatus("waiting");
             },
+            onSyncEvent: (data) => {
+                console.log("[booth] Received sync event:", data);
+                if (data.type === "START_CAPTURE") {
+                    setPhase("countdown");
+                    setCaptureIndex(0);
+                    runCountdown(0);
+                } else if (data.type === "PHOTO_TAKEN") {
+                    const store = useBoothStore.getState();
+                    // data.captureIndex, data.url
+                    setCaptures(store.captures.map((c, i) => {
+                        if (i === data.captureIndex) {
+                            return { ...c, remoteUrl: data.url };
+                        }
+                        return c;
+                    }));
+                } else if (data.type === "FILTER_CHANGE") {
+                    setSelectedFilter(data.filterId);
+                } else if (data.type === "RESET") {
+                    handleRetake(false);
+                }
+            }
         });
 
         return () => {
@@ -377,12 +400,22 @@ export default function BoothRoomPage() {
     }
 
     // Start capture sequence
-    const startCapture = useCallback(() => {
+    const startCapture = useCallback((isInitiator = true) => {
+        if (isInitiator && partnerConnected) {
+            sendSyncEvent({ type: "START_CAPTURE" });
+        }
         setPhase("countdown");
         setCaptureIndex(0);
         runCountdown(0);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedFilter, soloMode]);
+    }, [selectedFilter, soloMode, partnerConnected]);
+
+    const handleFilterSelect = (fid: FilterId) => {
+        setSelectedFilter(fid);
+        if (partnerConnected) {
+            sendSyncEvent({ type: "FILTER_CHANGE", filterId: fid });
+        }
+    };
 
     // Countdown + capture loop
     function runCountdown(captureIdx: number) {
@@ -424,13 +457,26 @@ export default function BoothRoomPage() {
         }
 
         if (localResult && remoteResult) {
+            // we have both already (solo mode, or we just snapped both feeds from WebRTC streams locally)
             const newCapture: CapturedFrame = {
-                localBlob: undefined as unknown as Blob, // lazy
+                localBlob: undefined as unknown as Blob,
                 localUrl: localResult.url,
                 remoteBlob: undefined as unknown as Blob,
                 remoteUrl: remoteResult.url,
             };
             addCapture(newCapture);
+        } else if (localResult) {
+            // Partner connected but remote capture failed locally or we only want local feed explicitly for network send
+            const newCapture: CapturedFrame = {
+                localBlob: undefined as unknown as Blob,
+                localUrl: localResult.url,
+                remoteBlob: undefined as unknown as Blob,
+                remoteUrl: localResult.url, // fallback until partner sends
+            };
+            addCapture(newCapture);
+            if (partnerConnected) {
+                sendSyncEvent({ type: "PHOTO_TAKEN", captureIndex: captureIdx, url: localResult.url });
+            }
         }
 
         const nextIdx = captureIdx + 1;
@@ -486,13 +532,25 @@ export default function BoothRoomPage() {
     }, [caption, showDateStamp, borderStyle, selectedFilter]);
 
     // Download strip
-    async function handleDownload(format: "png" | "jpg") {
+    async function handleDownload(format: "png" | "jpg" | "pdf") {
         if (!stripCanvas) return;
         setIsExporting(true);
         try {
-            const type = format === "jpg" ? "image/jpeg" : "image/png";
-            const blob = await canvasToBlob(stripCanvas, type);
-            downloadBlob(blob, `lovelens-strip-${roomId}.${format}`);
+            if (format === "pdf") {
+                const { jsPDF } = await import("jspdf");
+                const doc = new jsPDF({
+                    orientation: "portrait",
+                    unit: "px",
+                    format: [stripCanvas.width, stripCanvas.height]
+                });
+                const imgData = stripCanvas.toDataURL("image/jpeg", 1.0);
+                doc.addImage(imgData, "JPEG", 0, 0, stripCanvas.width, stripCanvas.height);
+                doc.save(`lovelens-strip-${roomId}.pdf`);
+            } else {
+                const type = format === "jpg" ? "image/jpeg" : "image/png";
+                const blob = await canvasToBlob(stripCanvas, type);
+                downloadBlob(blob, `lovelens-strip-${roomId}.${format}`);
+            }
         } catch (err) {
             console.error("Download failed:", err);
         }
@@ -517,7 +575,10 @@ export default function BoothRoomPage() {
     }
 
     // Reset and retry
-    function handleRetake() {
+    function handleRetake(isInitiator = true) {
+        if (isInitiator && partnerConnected) {
+            sendSyncEvent({ type: "RESET" });
+        }
         resetBooth();
         setStripCanvas(null);
         setStripUrl(null);
@@ -738,7 +799,7 @@ export default function BoothRoomPage() {
                                 <div className="mt-5">
                                     <FilterCarousel
                                         selected={selectedFilter}
-                                        onSelect={setSelectedFilter}
+                                        onSelect={handleFilterSelect}
                                     />
                                 </div>
 
@@ -748,7 +809,7 @@ export default function BoothRoomPage() {
                                         <motion.button
                                             whileHover={{ scale: 1.05 }}
                                             whileTap={{ scale: 0.95 }}
-                                            onClick={startCapture}
+                                            onClick={() => startCapture(true)}
                                             className="btn-primary text-lg px-10 py-4 pulse-glow inline-flex items-center gap-2"
                                             disabled={!localStream}
                                         >
@@ -956,6 +1017,18 @@ export default function BoothRoomPage() {
                                                 )}
                                                 JPG
                                             </button>
+                                            <button
+                                                onClick={() => handleDownload("pdf")}
+                                                disabled={!stripCanvas || isExporting}
+                                                className="btn-primary col-span-2 text-sm flex items-center justify-center gap-2 disabled:opacity-40"
+                                            >
+                                                {isExporting ? (
+                                                    <Loader2 size={16} className="animate-spin" />
+                                                ) : (
+                                                    <Download size={16} />
+                                                )}
+                                                Export as PDF
+                                            </button>
                                         </div>
 
                                         <button
@@ -968,7 +1041,7 @@ export default function BoothRoomPage() {
                                         </button>
 
                                         <button
-                                            onClick={handleRetake}
+                                            onClick={() => handleRetake(true)}
                                             className="w-full text-center text-sm text-gray-400 hover:text-white transition-colors flex items-center justify-center gap-1.5 py-2"
                                         >
                                             <RotateCcw size={14} />

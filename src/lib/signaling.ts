@@ -17,6 +17,7 @@ export interface SignalingCallbacks {
     onOffer?: (data: { sdp: RTCSessionDescriptionInit }) => void;
     onAnswer?: (data: { sdp: RTCSessionDescriptionInit }) => void;
     onIceCandidate?: (data: { candidate: RTCIceCandidateInit }) => void;
+    onSyncEvent?: (data: any) => void;
 }
 
 let socket: Socket | null = null;
@@ -75,6 +76,10 @@ export function connectToSignalingServer(
         callbacks.onIceCandidate?.(data);
     });
 
+    socket.on("sync-event", (data) => {
+        callbacks.onSyncEvent?.(data);
+    });
+
     socket.on("disconnect", () => {
         console.log("[signaling] Disconnected");
     });
@@ -96,6 +101,10 @@ export function sendAnswer(sdp: RTCSessionDescriptionInit) {
 
 export function sendIceCandidate(candidate: RTCIceCandidateInit) {
     socket?.emit("ice-candidate", { candidate });
+}
+
+export function sendSyncEvent(data: any) {
+    socket?.emit("sync-event", data);
 }
 
 export function disconnectSignaling() {

@@ -123,6 +123,7 @@ interface BoothStore {
     setCountdownValue: (value: number) => void;
     addCapture: (capture: CapturedFrame) => void;
     setCaptureIndex: (index: number) => void;
+    setCaptures: (captures: CapturedFrame[]) => void;
     setCaption: (caption: string) => void;
     setShowDateStamp: (show: boolean) => void;
     setBorderStyle: (style: "white" | "pink" | "black" | "polaroid") => void;
@@ -157,6 +158,7 @@ export const useBoothStore = create<BoothStore>((set) => ({
     addCapture: (capture) =>
         set((state) => ({ captures: [...state.captures, capture] })),
     setCaptureIndex: (index) => set({ captureIndex: index }),
+    setCaptures: (captures) => set({ captures }),
     setCaption: (caption) => set({ caption }),
     setShowDateStamp: (show) => set({ showDateStamp: show }),
     setBorderStyle: (style) => set({ borderStyle: style }),

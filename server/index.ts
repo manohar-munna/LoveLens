@@ -145,6 +145,11 @@ io.on("connection", (socket: Socket) => {
         socket.to(currentRoom).emit("ice-candidate", data);
     });
 
+    socket.on("sync-event", (data: any) => {
+        if (!currentRoom) return;
+        socket.to(currentRoom).emit("sync-event", data);
+    });
+
     socket.on("disconnect", () => {
         console.log(`[ws] Disconnected: ${socket.id}`);
         if (currentRoom) leaveRoom(socket, currentRoom);

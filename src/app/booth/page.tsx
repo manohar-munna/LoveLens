@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 import { Heart, Camera, Link2, Copy, Check, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { generateRoomId, getRoomUrl, copyToClipboard } from "@/lib/room";
+import { SIGNALING_URL } from "@/lib/signaling";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import Link from "next/link";
 
 export default function BoothEntryPage() {
@@ -17,7 +19,7 @@ export default function BoothEntryPage() {
     async function handleCreateRoom() {
         const id = generateRoomId();
         try {
-            const res = await fetch("/api/rooms", {
+            const res = await fetch(`${SIGNALING_URL}/api/rooms`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ roomId: id }),
@@ -55,7 +57,7 @@ export default function BoothEntryPage() {
         setJoinError("");
 
         try {
-            const res = await fetch(`/api/rooms/${code}`);
+            const res = await fetch(`${SIGNALING_URL}/api/rooms/${code}`);
             const data = await res.json();
 
             if (!data.exists) {
@@ -77,13 +79,14 @@ export default function BoothEntryPage() {
     return (
         <div className="gradient-hero min-h-screen">
             {/* Nav */}
-            <nav className="flex items-center justify-between px-6 md:px-12 py-5">
+            <nav className="flex items-center justify-between px-4 sm:px-6 md:px-12 py-5">
                 <Link href="/" className="flex items-center gap-2">
                     <Heart size={24} className="text-pink-primary" fill="currentColor" />
                     <span className="text-lg font-bold font-[family-name:var(--font-outfit)] gradient-text">
                         LoveLens
                     </span>
                 </Link>
+                <ThemeToggle />
             </nav>
 
             <div className="max-w-xl mx-auto px-6 pt-10 md:pt-20 pb-20">

@@ -1,0 +1,13 @@
+{
+    "name": "lovelens-signaling",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "start": "npx tsx index.ts",
+        "dev": "npx tsx --watch index.ts"
+    },
+    "dependencies": {
+        "socket.io": "^4.8.3",
+        "tsx": "^4.21.0"
+    }
+}

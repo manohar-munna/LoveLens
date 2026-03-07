@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "npx tsx custom-server.ts",
+    "dev": "concurrently \"next dev\" \"npx tsx server/index.ts\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "server": "npx tsx server.ts"
+    "server": "npx tsx server/index.ts"
   },
   "dependencies": {
     "framer-motion": "^12.35.0",
@@ -28,6 +28,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
+    "concurrently": "^9.2.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",

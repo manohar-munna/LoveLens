@@ -13,49 +13,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
-// Floating hearts background — client-only to avoid hydration mismatch
-function FloatingHearts() {
-  const [hearts, setHearts] = useState<
-    { id: number; left: number; delay: number; duration: number; size: number; opacity: number }[]
-  >([]);
-
-  useEffect(() => {
-    setHearts(
-      Array.from({ length: 15 }, (_, i) => ({
-        id: i,
-        left: Math.random() * 100,
-        delay: Math.random() * 8,
-        duration: 6 + Math.random() * 6,
-        size: 10 + Math.random() * 18,
-        opacity: 0.15 + Math.random() * 0.25,
-      }))
-    );
-  }, []);
-
-  if (hearts.length === 0) return null;
-
-  return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-      {hearts.map((h) => (
-        <div
-          key={h.id}
-          className="absolute floating-heart text-pink-primary"
-          style={{
-            left: `${h.left}%`,
-            bottom: "-20px",
-            animationDelay: `${h.delay}s`,
-            animationDuration: `${h.duration}s`,
-            fontSize: `${h.size}px`,
-            opacity: h.opacity,
-          }}
-        >
-          ♥
-        </div>
-      ))}
-    </div>
-  );
-}
 
 // Animated counter
 function AnimatedCounter({ target, label }: { target: number; label: string }) {
@@ -206,10 +165,9 @@ export default function LandingPage() {
 
   return (
     <div className="gradient-hero min-h-screen">
-      <FloatingHearts />
 
       {/* Navbar */}
-      <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-5">
+      <nav className="relative z-10 flex items-center justify-between px-4 sm:px-6 md:px-12 py-5">
         <div className="flex items-center gap-2">
           <Heart
             size={26}
@@ -221,6 +179,7 @@ export default function LandingPage() {
           </span>
         </div>
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <Link
             href="/booth"
             className="btn-secondary text-sm hidden md:block"

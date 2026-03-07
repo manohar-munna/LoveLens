@@ -5,7 +5,7 @@
 
 import { io, Socket } from "socket.io-client";
 
-const SIGNALING_URL = process.env.NEXT_PUBLIC_SIGNALING_URL || "";
+export const SIGNALING_URL = process.env.NEXT_PUBLIC_SIGNALING_URL || "http://localhost:3001";
 
 export interface SignalingCallbacks {
     onRoomJoined?: (data: { roomId: string; isHost: boolean; memberCount: number }) => void;

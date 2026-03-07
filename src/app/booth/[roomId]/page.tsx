@@ -51,6 +51,7 @@ import {
     addIceCandidate as rtcAddIceCandidate,
     closePeerConnection,
 } from "@/lib/webrtc";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 // ─── Countdown Overlay ─────────────────────────────────────────
 function CountdownOverlay({ value }: { value: number }) {
@@ -603,26 +604,27 @@ export default function BoothRoomPage() {
                     </span>
                 </Link>
 
-                <div className="flex items-center gap-3">
-                    <div className="glass rounded-lg px-3 py-1.5 text-xs font-mono tracking-wider text-gray-300">
+                <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="glass rounded-lg px-2 sm:px-3 py-1.5 text-xs font-mono tracking-wider hidden sm:block" style={{ color: 'var(--text-secondary)' }}>
                         Room: {roomId}
                     </div>
-                    <div className={`glass rounded-lg px-3 py-1.5 text-xs flex items-center gap-1.5 ${partnerConnected ? 'text-mint' : connectionStatus === 'waiting' ? 'text-yellow-400' : 'text-gray-400'
+                    <div className={`glass rounded-lg px-2 sm:px-3 py-1.5 text-xs flex items-center gap-1.5 ${partnerConnected ? 'text-mint' : connectionStatus === 'waiting' ? 'text-yellow-400' : 'text-gray-400'
                         }`}>
                         {partnerConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
-                        {partnerConnected ? 'Connected' : connectionStatus === 'waiting' ? 'Waiting...' : 'Connecting...'}
+                        <span className="hidden sm:inline">{partnerConnected ? 'Connected' : connectionStatus === 'waiting' ? 'Waiting...' : 'Connecting...'}</span>
                     </div>
                     <button
                         onClick={handleCopyLink}
-                        className="glass rounded-lg px-3 py-1.5 text-xs flex items-center gap-1 hover:border-pink-primary/30 transition-colors"
+                        className="glass rounded-lg px-2 sm:px-3 py-1.5 text-xs flex items-center gap-1 hover:border-pink-primary/30 transition-colors"
                     >
                         {copied ? (
                             <Check size={12} className="text-mint" />
                         ) : (
                             <Copy size={12} />
                         )}
-                        {copied ? "Copied!" : "Invite"}
+                        <span className="hidden sm:inline">{copied ? "Copied!" : "Invite"}</span>
                     </button>
+                    <ThemeToggle />
                 </div>
             </div>
 

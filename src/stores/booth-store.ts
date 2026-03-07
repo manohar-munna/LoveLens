@@ -111,6 +111,9 @@ interface BoothStore {
     showDateStamp: boolean;
     borderStyle: "white" | "pink" | "black" | "polaroid";
 
+    // Retake request
+    retakeRequest: boolean;
+
     // Actions
     setRoomId: (id: string | null) => void;
     setIsHost: (isHost: boolean) => void;
@@ -127,6 +130,7 @@ interface BoothStore {
     setCaption: (caption: string) => void;
     setShowDateStamp: (show: boolean) => void;
     setBorderStyle: (style: "white" | "pink" | "black" | "polaroid") => void;
+    setRetakeRequest: (request: boolean) => void;
     resetBooth: () => void;
 }
 
@@ -145,6 +149,7 @@ export const useBoothStore = create<BoothStore>((set) => ({
     caption: "",
     showDateStamp: true,
     borderStyle: "white",
+    retakeRequest: false,
 
     setRoomId: (id) => set({ roomId: id }),
     setIsHost: (isHost) => set({ isHost }),
@@ -167,11 +172,13 @@ export const useBoothStore = create<BoothStore>((set) => ({
     setCaption: (caption) => set({ caption }),
     setShowDateStamp: (show) => set({ showDateStamp: show }),
     setBorderStyle: (style) => set({ borderStyle: style }),
+    setRetakeRequest: (request) => set({ retakeRequest: request }),
     resetBooth: () =>
         set({
             phase: "waiting",
             captures: [],
             captureIndex: 0,
             caption: "",
+            retakeRequest: false,
         }),
 }));

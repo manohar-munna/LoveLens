@@ -88,6 +88,7 @@ const io = new Server(httpServer, {
         origin: "*",
         methods: ["GET", "POST"],
     },
+    maxHttpBufferSize: 5e7, // 50MB for base64 images
 });
 
 // ─── Socket.IO Signaling ──────────────────────────────────────────

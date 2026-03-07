@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Heart, Camera, Link2, Copy, Check, ArrowRight } from "lucide-react";
+import { Heart, Camera, Link2, Copy, Check, ArrowRight, Loader2, Share2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { generateRoomId, getRoomUrl, copyToClipboard } from "@/lib/room";
 import { SIGNALING_URL } from "@/lib/signaling";
@@ -15,8 +15,10 @@ export default function BoothEntryPage() {
     const [generatedRoomId, setGeneratedRoomId] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [joinError, setJoinError] = useState("");
+    const [isCreating, setIsCreating] = useState(false);
 
     async function handleCreateRoom() {
+        setIsCreating(true);
         const id = generateRoomId();
         try {
             const res = await fetch(`${SIGNALING_URL}/api/rooms`, {
@@ -29,6 +31,8 @@ export default function BoothEntryPage() {
             }
         } catch {
             setGeneratedRoomId(id);
+        } finally {
+            setIsCreating(false);
         }
     }
 
@@ -45,6 +49,23 @@ export default function BoothEntryPage() {
         if (success) {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
+        }
+    }
+
+    async function handleShareLink() {
+        if (!generatedRoomId) return;
+        const url = getRoomUrl(generatedRoomId);
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: "Join my LoveLens Photobooth",
+                    url: url
+                });
+            } catch (err) {
+                console.error("Share failed", err);
+            }
+        } else {
+            handleCopyLink();
         }
     }
 
@@ -120,8 +141,19 @@ export default function BoothEntryPage() {
                     </h2>
 
                     {!generatedRoomId ? (
-                        <button onClick={handleCreateRoom} className="btn-primary w-full">
-                            Create Booth Room 💕
+                        <button
+                            onClick={handleCreateRoom}
+                            disabled={isCreating}
+                            className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                            {isCreating ? (
+                                <>
+                                    <Loader2 size={18} className="animate-spin" />
+                                    Creating Room...
+                                </>
+                            ) : (
+                                "Create Booth Room 💕"
+                            )}
                         </button>
                     ) : (
                         <div className="space-y-4">
@@ -133,23 +165,32 @@ export default function BoothEntryPage() {
                                 </p>
                             </div>
 
-                            {/* Copy link */}
-                            <button
-                                onClick={handleCopyLink}
-                                className="btn-secondary w-full flex items-center justify-center gap-2"
-                            >
-                                {copied ? (
-                                    <>
-                                        <Check size={16} className="text-mint" />
-                                        Link Copied!
-                                    </>
-                                ) : (
-                                    <>
-                                        <Copy size={16} />
-                                        Copy Invite Link
-                                    </>
-                                )}
-                            </button>
+                            {/* Copy/Share links */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={handleCopyLink}
+                                    className="btn-secondary w-full flex items-center justify-center gap-2 text-sm py-3"
+                                >
+                                    {copied ? (
+                                        <>
+                                            <Check size={16} className="text-mint" />
+                                            Copied!
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Copy size={16} />
+                                            Copy Link
+                                        </>
+                                    )}
+                                </button>
+                                <button
+                                    onClick={handleShareLink}
+                                    className="btn-secondary w-full flex items-center justify-center gap-2 text-sm py-3"
+                                >
+                                    <Share2 size={16} />
+                                    Share
+                                </button>
+                            </div>
 
                             {/* Enter booth */}
                             <button

@@ -214,6 +214,8 @@ export default function BoothRoomPage() {
         setCaption,
         setShowDateStamp,
         setBorderStyle,
+        retakeRequest,
+        setRetakeRequest,
         resetBooth,
         setCaptures,
     } = useBoothStore();
@@ -232,6 +234,7 @@ export default function BoothRoomPage() {
     useEffect(() => { soloModeRef.current = soloMode; }, [soloMode]);
     const [roomFull, setRoomFull] = useState(false);
     const [roomNotFound, setRoomNotFound] = useState(false);
+    const [retakeSent, setRetakeSent] = useState(false);
 
     // Queue for photo taken events that arrive before local addCapture()
     const remotePhotoQueue = useRef<Record<number, string>>({});
@@ -375,7 +378,11 @@ export default function BoothRoomPage() {
                 } else if (data.type === "FILTER_CHANGE") {
                     setSelectedFilter(data.filterId);
                 } else if (data.type === "RESET") {
-                    handleRetake(false);
+                    executeReset();
+                } else if (data.type === "RETAKE_REQUEST") {
+                    useBoothStore.getState().setRetakeRequest(true);
+                } else if (data.type === "RETAKE_ACCEPT") {
+                    executeReset();
                 }
             }
         });
@@ -579,13 +586,26 @@ export default function BoothRoomPage() {
     }
 
     // Reset and retry
-    function handleRetake(isInitiator = true) {
-        if (isInitiator && partnerConnected) {
-            sendSyncEvent({ type: "RESET" });
+    function handleRetakeRequest() {
+        if (partnerConnected) {
+            sendSyncEvent({ type: "RETAKE_REQUEST" });
+            setRetakeSent(true);
+            setTimeout(() => setRetakeSent(false), 3000);
+        } else {
+            executeReset();
         }
+    }
+
+    function handleAcceptRetake() {
+        sendSyncEvent({ type: "RETAKE_ACCEPT" });
+        executeReset();
+    }
+
+    function executeReset() {
         resetBooth();
         setStripCanvas(null);
         setStripUrl(null);
+        setRetakeRequest(false);
         setPhase("preview");
     }
 
@@ -776,9 +796,9 @@ export default function BoothRoomPage() {
                                                     <p className="text-sm text-gray-400 mb-2">
                                                         {roomFull
                                                             ? "Room is full (2/2)"
-                                                            : connectionStatus === "waiting"
-                                                                ? "Waiting for your partner..."
-                                                                : "Connecting to room..."}
+                                                            : connectionStatus === "connecting"
+                                                                ? "Partner is joining..."
+                                                                : "Waiting for your partner..."}
                                                     </p>
                                                     {!roomFull && (
                                                         <>
@@ -1045,11 +1065,11 @@ export default function BoothRoomPage() {
                                         </button>
 
                                         <button
-                                            onClick={() => handleRetake(true)}
+                                            onClick={handleRetakeRequest}
                                             className="w-full text-center text-sm text-gray-400 hover:text-white transition-colors flex items-center justify-center gap-1.5 py-2"
                                         >
                                             <RotateCcw size={14} />
-                                            Take New Photos
+                                            {retakeSent ? "Request Sent..." : "Take New Photos"}
                                         </button>
                                     </div>
                                 </div>
@@ -1058,6 +1078,40 @@ export default function BoothRoomPage() {
                     )}
                 </AnimatePresence>
             </div>
+
+            {/* Retake Request Snackbar */}
+            <AnimatePresence>
+                {retakeRequest && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 50 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 50 }}
+                        className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-charcoal/90 backdrop-blur-md border border-white/10 rounded-2xl p-4 shadow-2xl z-50 flex items-center gap-4 max-w-sm w-full"
+                    >
+                        <div className="w-10 h-10 rounded-full gradient-pink flex items-center justify-center shrink-0">
+                            <Heart size={18} className="text-white" fill="currentColor" />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-sm font-bold font-[family-name:var(--font-outfit)] text-white">Partner wants to retake!</p>
+                            <p className="text-xs text-gray-400">Take new photos together?</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setRetakeRequest(false)}
+                                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+                            >
+                                <X size={14} className="text-gray-300" />
+                            </button>
+                            <button
+                                onClick={handleAcceptRetake}
+                                className="h-8 px-3 rounded-full btn-primary text-xs flex items-center justify-center shrink-0"
+                            >
+                                Accept
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

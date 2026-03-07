@@ -358,19 +358,18 @@ export default function BoothRoomPage() {
                     setCaptureIndex(0);
                     runCountdown(0);
                 } else if (data.type === "PHOTO_TAKEN") {
-                    const store = useBoothStore.getState();
-                    const existingCapture = store.captures[data.captureIndex];
-                    if (existingCapture) {
-                        setCaptures(store.captures.map((c, i) => {
-                            if (i === data.captureIndex) {
-                                return { ...c, remoteUrl: data.url };
-                            }
-                            return c;
-                        }));
-                    } else {
-                        // We received photo before local capture finished! Queue it.
-                        remotePhotoQueue.current[data.captureIndex] = data.url;
-                    }
+                    setCaptures((prevCaptures) => {
+                        const newCaptures = [...prevCaptures];
+                        const existing = newCaptures[data.captureIndex];
+                        if (existing) {
+                            // Update existing capture with remote URL
+                            newCaptures[data.captureIndex] = { ...existing, remoteUrl: data.url };
+                        } else {
+                            // We received photo before local capture finished! Queue it.
+                            remotePhotoQueue.current[data.captureIndex] = data.url;
+                        }
+                        return newCaptures;
+                    });
                 } else if (data.type === "FILTER_CHANGE") {
                     setSelectedFilter(data.filterId);
                 } else if (data.type === "RESET") {
@@ -857,7 +856,7 @@ export default function BoothRoomPage() {
                                             {/* Preview grid of captures */}
                                             <div className="bg-white rounded-xl p-3 space-y-2">
                                                 {captures.map((c, i) => (
-                                                    <div key={i} className="flex gap-2">
+                                                    <div key={i} className="flex">
                                                         <img
                                                             src={c.localUrl}
                                                             alt={`Capture ${i + 1} - You`}

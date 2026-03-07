@@ -479,7 +479,7 @@ export default function BoothRoomPage() {
                 localBlob: undefined as unknown as Blob,
                 localUrl: localResult.url,
                 remoteBlob: undefined as unknown as Blob,
-                remoteUrl: isSoloMode ? localResult.url : (queuedRemoteUrl || ""), // fallback if missing
+                remoteUrl: isSoloMode ? "" : (queuedRemoteUrl || ""),
             };
 
             addCapture(newCapture);
@@ -513,9 +513,19 @@ export default function BoothRoomPage() {
 
         const currentCaptures = useBoothStore.getState().captures;
 
+        // Wait if we have less than 4 valid remoteUrls (unless solo mode)
+        const isSoloMode = soloModeRef.current;
+        const missingRemote = currentCaptures.some(c => !c.remoteUrl);
+
+        if (!isSoloMode && missingRemote) {
+            console.log("Waiting for remote captures to sync...");
+            // We return and let the useEffect retrigger when state naturally updates
+            return;
+        }
+
         const stripCaptures = currentCaptures.map((c) => ({
             localUrl: c.localUrl,
-            remoteUrl: c.remoteUrl || c.localUrl,
+            remoteUrl: isSoloMode ? "" : (c.remoteUrl || ""),
         }));
 
         try {
@@ -897,9 +907,9 @@ export default function BoothRoomPage() {
                                                             }}
                                                         />
                                                         <img
-                                                            src={c.remoteUrl || c.localUrl}
+                                                            src={c.remoteUrl || ""}
                                                             alt={`Capture ${i + 1} - Partner`}
-                                                            className="w-1/2 aspect-[4/3] rounded-r-lg object-cover"
+                                                            className={`w-1/2 aspect-[4/3] rounded-r-lg object-cover ${!c.remoteUrl ? "bg-charcoal/50 animate-pulse" : ""}`}
                                                             style={{
                                                                 filter:
                                                                     filter.cssFilter !== "none"

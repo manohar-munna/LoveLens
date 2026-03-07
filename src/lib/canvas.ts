@@ -79,7 +79,7 @@ export async function composePhotostrip(
 
         try {
             const localImg = await loadImage(captures[i].localUrl);
-            const remoteImg = captures[i].remoteUrl ? await loadImage(captures[i].remoteUrl) : localImg;
+            const remoteImg = captures[i].remoteUrl ? await loadImage(captures[i].remoteUrl) : null;
 
             const halfWidth = innerWidth / 2;
 
@@ -91,8 +91,12 @@ export async function composePhotostrip(
             // Draw left image (local)
             drawImageCenter(ctx, localImg, BORDER, yOffset, halfWidth, FRAME_HEIGHT);
 
-            // Draw right image (remote)
-            drawImageCenter(ctx, remoteImg, BORDER + halfWidth, yOffset, halfWidth, FRAME_HEIGHT);
+            // Draw right image (remote) or fallback to local if explicitly requested (solo mode)
+            if (remoteImg) {
+                drawImageCenter(ctx, remoteImg, BORDER + halfWidth, yOffset, halfWidth, FRAME_HEIGHT);
+            } else {
+                drawImageCenter(ctx, localImg, BORDER + halfWidth, yOffset, halfWidth, FRAME_HEIGHT);
+            }
 
             // subtle separator line in the middle
             if (borderStyle !== "black") {

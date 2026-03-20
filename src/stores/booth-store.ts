@@ -129,6 +129,8 @@ interface BoothStore {
     selectedTemplate: TemplateId;
     localSide: "left" | "right";
     localZoom: number;
+    remoteZoom: number;
+    remoteFacingMode: "user" | "environment";
 
     // Retake request
     retakeRequest: boolean;
@@ -153,6 +155,8 @@ interface BoothStore {
     setSelectedTemplate: (template: TemplateId) => void;
     setLocalSide: (side: "left" | "right") => void;
     setLocalZoom: (zoom: number) => void;
+    setRemoteZoom: (zoom: number) => void;
+    setRemoteFacingMode: (mode: "user" | "environment") => void;
     setRetakeRequest: (request: boolean) => void;
     resetBooth: () => void;
 }
@@ -176,6 +180,8 @@ export const useBoothStore = create<BoothStore>((set) => ({
     selectedTemplate: "none",
     localSide: "left",
     localZoom: 1,
+    remoteZoom: 1,
+    remoteFacingMode: "user",
     retakeRequest: false,
 
     setRoomId: (id) => set({ roomId: id }),
@@ -203,6 +209,8 @@ export const useBoothStore = create<BoothStore>((set) => ({
     setSelectedTemplate: (template) => set({ selectedTemplate: template }),
     setLocalSide: (side) => set({ localSide: side }),
     setLocalZoom: (zoom) => set({ localZoom: zoom }),
+    setRemoteZoom: (zoom) => set({ remoteZoom: zoom }),
+    setRemoteFacingMode: (mode) => set({ remoteFacingMode: mode }),
     setRetakeRequest: (request) => set({ retakeRequest: request }),
     resetBooth: () =>
         set({

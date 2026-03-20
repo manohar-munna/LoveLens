@@ -21,6 +21,8 @@ import {
     ArrowLeft,
     ArrowLeftRight,
     RefreshCw,
+    ZoomIn,
+    Smartphone,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -31,6 +33,7 @@ import {
     type FilterId,
     type CapturedFrame,
 } from "@/stores/booth-store";
+// ... (I will use more targeted replacements for safety)
 import { initCamera, captureFrame, stopStream } from "@/lib/camera";
 import {
     composePhotostrip,
@@ -365,6 +368,7 @@ export default function BoothRoomPage() {
     const [roomNotFound, setRoomNotFound] = useState(false);
     const [retakeSent, setRetakeSent] = useState(false);
     const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+    const [isRotated, setIsRotated] = useState(false);
 
     // Queue for photo taken events that arrive before local addCapture()
     const remotePhotoQueue = useRef<Record<number, string>>({});
@@ -376,6 +380,10 @@ export default function BoothRoomPage() {
     const toggleCamera = async () => {
         const newMode = facingMode === "user" ? "environment" : "user";
         setFacingMode(newMode);
+        
+        if (partnerConnected) {
+            sendSyncEvent({ type: "FACING_MODE_CHANGE", mode: newMode });
+        }
         
         const oldStream = localStreamRef.current;
         
@@ -529,6 +537,10 @@ export default function BoothRoomPage() {
                     setSelectedTemplate(data.filterId as any);
                 } else if (data.type === "SIDE_CHANGE") {
                     setLocalSide(data.side);
+                } else if (data.type === "ZOOM_CHANGE") {
+                    useBoothStore.getState().setRemoteZoom(data.zoom);
+                } else if (data.type === "FACING_MODE_CHANGE") {
+                    useBoothStore.getState().setRemoteFacingMode(data.mode);
                 } else if (data.type === "RESET") {
                     executeReset();
                 } else if (data.type === "RETAKE_REQUEST") {
@@ -932,6 +944,17 @@ export default function BoothRoomPage() {
         );
     }
 
+    const handleZoomChange = (newZoom: number) => {
+        setLocalZoom(newZoom);
+        if (partnerConnected) {
+            sendSyncEvent({ type: "ZOOM_CHANGE", zoom: newZoom });
+        }
+    };
+
+    const handleResetZoom = () => {
+        handleZoomChange(1);
+    };
+
     const localFeed = (
         <div className="relative">
             <CameraFeed
@@ -944,8 +967,17 @@ export default function BoothRoomPage() {
                 showFlipButton={true}
                 mirrored={facingMode === "user"}
                 zoom={localZoom}
-                onZoomChange={setLocalZoom}
+                onZoomChange={handleZoomChange}
             />
+            {/* Reset Zoom Button */}
+            {localZoom !== 1 && (
+                <button 
+                    onClick={handleResetZoom}
+                    className="absolute top-12 right-2 bg-black/50 backdrop-blur-md text-white/90 text-xs px-2 py-1.5 rounded-lg border border-white/10 hover:bg-black/70 transition-colors z-20"
+                >
+                    Reset Zoom
+                </button>
+            )}
             {phase === "countdown" && (
                 <CountdownOverlay value={countdownValue} />
             )}
@@ -960,8 +992,9 @@ export default function BoothRoomPage() {
                 filter={filter.cssFilter}
                 label={partnerConnected ? "Partner 💝" : (soloMode ? "You (mirrored)" : "Partner 💝")}
                 videoRef={remoteVideoRef}
-                mirrored={partnerConnected ? false : (soloMode ? (facingMode === "user") : true)}
+                mirrored={partnerConnected ? useBoothStore.getState().remoteFacingMode === "user" : (soloMode ? (facingMode === "user") : true)}
                 templateEmoji={template?.emoji}
+                zoom={partnerConnected ? useBoothStore.getState().remoteZoom : (soloMode ? localZoom : 1)}
             />
             {phase === "countdown" && (
                 <CountdownOverlay value={countdownValue} />
@@ -1020,9 +1053,18 @@ export default function BoothRoomPage() {
                 </div>
 
                 <div className="flex items-center gap-2 sm:gap-3">
+                    <button
+                        onClick={() => setIsRotated(!isRotated)}
+                        className="glass rounded-lg px-2 sm:px-3 py-1.5 text-xs flex items-center gap-1 hover:border-pink-primary/30 transition-colors"
+                        title="Rotate Screen"
+                    >
+                        <Smartphone size={12} className={isRotated ? "rotate-90 transition-transform" : "transition-transform"} />
+                        <span className="hidden sm:inline">Rotate</span>
+                    </button>
                     <div className="glass rounded-lg px-2 sm:px-3 py-1.5 text-xs font-mono tracking-wider hidden sm:block" style={{ color: 'var(--text-secondary)' }}>
                         Room: {roomId}
                     </div>
+
                     <div className={`glass rounded-lg px-2 sm:px-3 py-1.5 text-xs flex items-center gap-1.5 ${partnerConnected ? 'text-mint' : connectionStatus === 'waiting' ? 'text-yellow-400' : 'text-gray-400'
                         }`}>
                         {partnerConnected ? <Wifi size={12} /> : <WifiOff size={12} />}

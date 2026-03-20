@@ -116,6 +116,7 @@ function CameraFeed({
 }) {
     const internalRef = useRef<HTMLVideoElement>(null);
     const ref = videoRef || internalRef;
+    const [showZoomSlider, setShowZoomSlider] = useState(false);
 
     useEffect(() => {
         if (ref.current && stream) {
@@ -123,60 +124,25 @@ function CameraFeed({
         }
     }, [stream, ref]);
 
+    // Handle clicks outside the slider to close it
     useEffect(() => {
-        const video = ref.current;
-        if (!video || !onZoomChange) return;
-
-        let startDistance = 0;
-        let startZoom = 1;
-
-        const handleTouchStart = (e: TouchEvent) => {
-            if (e.touches.length === 2) {
-                e.preventDefault();
-                startDistance = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                );
-                startZoom = zoom;
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest('.zoom-control')) {
+                setShowZoomSlider(false);
             }
         };
 
-        const handleTouchMove = (e: TouchEvent) => {
-            if (e.touches.length === 2) {
-                e.preventDefault();
-                const currentDistance = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                );
-                const scale = currentDistance / startDistance;
-                let newZoom = startZoom * scale;
-                newZoom = Math.max(0.3, Math.min(newZoom, 4));
-                onZoomChange(newZoom);
-            }
-        };
-
-        const handleWheel = (e: WheelEvent) => {
-            if (e.ctrlKey || e.metaKey) {
-                e.preventDefault();
-                let newZoom = zoom - e.deltaY * 0.01;
-                newZoom = Math.max(0.3, Math.min(newZoom, 4));
-                onZoomChange(newZoom);
-            }
-        };
-
-        video.addEventListener('touchstart', handleTouchStart, { passive: false });
-        video.addEventListener('touchmove', handleTouchMove, { passive: false });
-        video.addEventListener('wheel', handleWheel, { passive: false });
-
+        if (showZoomSlider) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
         return () => {
-            video.removeEventListener('touchstart', handleTouchStart);
-            video.removeEventListener('touchmove', handleTouchMove);
-            video.removeEventListener('wheel', handleWheel);
+            document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [zoom, ref, onZoomChange]);
+    }, [showZoomSlider]);
 
     return (
-        <div className="camera-feed relative">
+        <div className="camera-feed relative rounded-xl overflow-hidden aspect-[3/4] sm:aspect-video w-full">
             <video
                 ref={ref}
                 autoPlay
@@ -185,18 +151,53 @@ function CameraFeed({
                 style={{
                     filter: filter !== "none" ? filter : undefined,
                     transform: `scale(${mirrored ? -zoom : zoom}, ${zoom})`,
+                    transformOrigin: 'center center',
                 }}
                 className="w-full h-full object-cover transition-transform duration-75"
             />
-            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+            
+            {/* Top controls (Zoom) */}
+            {onZoomChange && (
+                <div className="absolute top-2 right-2 zoom-control flex flex-col items-end gap-2 z-20">
+                    <button
+                        onClick={() => setShowZoomSlider(!showZoomSlider)}
+                        className="bg-black/50 backdrop-blur-md text-white/90 text-xs px-2 py-1.5 rounded-lg border border-white/10 hover:bg-black/70 transition-colors"
+                    >
+                        {zoom.toFixed(1)}x Zoom
+                    </button>
+                    
+                    <AnimatePresence>
+                        {showZoomSlider && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -10, scale: 0.9 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -10, scale: 0.9 }}
+                                className="bg-charcoal/90 backdrop-blur-xl border border-white/10 p-3 rounded-xl shadow-2xl flex flex-col items-center gap-2"
+                            >
+                                <span className="text-[10px] text-gray-400 font-medium tracking-wider uppercase">Zoom Level</span>
+                                <input 
+                                    type="range" 
+                                    min="0.5" 
+                                    max="3" 
+                                    step="0.1" 
+                                    value={zoom} 
+                                    onChange={(e) => onZoomChange(parseFloat(e.target.value))}
+                                    className="w-24 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-pink-primary"
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            )}
 
+            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between z-10">
                 <div className="bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1 text-xs text-white/80 flex items-center gap-2">
                     <span>{label}</span>
                 </div>
                 {showFlipButton && onFlipCamera && (
                     <button
                         onClick={onFlipCamera}
-                        className="w-8 h-8 rounded-lg bg-black/50 backdrop-blur-sm text-white hover:text-pink-light transition-colors flex items-center justify-center"
+                        className="w-8 h-8 rounded-lg bg-black/50 backdrop-blur-sm text-white hover:text-pink-light transition-colors flex items-center justify-center border border-white/10"
                         title="Flip Camera"
                     >
                         <RefreshCw size={14} />
@@ -204,7 +205,7 @@ function CameraFeed({
                 )}
             </div>
             {!stream && (
-                <div className="absolute inset-0 flex items-center justify-center bg-charcoal/80">
+                <div className="absolute inset-0 flex items-center justify-center bg-charcoal/80 z-0">
                     <div className="text-center">
                         <Camera size={32} className="text-gray-500 mx-auto mb-2" />
                         <p className="text-sm text-gray-500">Waiting for camera...</p>
@@ -324,6 +325,7 @@ export default function BoothRoomPage() {
         remoteStream,
         connectionStatus,
         localSide,
+        localZoom,
         setLocalStream,
         setRemoteStream,
         setIsHost,
@@ -333,6 +335,7 @@ export default function BoothRoomPage() {
         setSelectedFilter,
         setSelectedTemplate,
         setLocalSide,
+        setLocalZoom,
         setCountdownValue,
         addCapture,
         setCaptureIndex,
@@ -940,6 +943,8 @@ export default function BoothRoomPage() {
                 onFlipCamera={toggleCamera}
                 showFlipButton={true}
                 mirrored={facingMode === "user"}
+                zoom={localZoom}
+                onZoomChange={setLocalZoom}
             />
             {phase === "countdown" && (
                 <CountdownOverlay value={countdownValue} />
@@ -1193,32 +1198,37 @@ export default function BoothRoomPage() {
                                         <div className="glass-card p-3 rounded-2xl">
                                             {/* Preview grid of captures */}
                                             <div className="bg-white rounded-xl p-3 space-y-2">
-                                                {captures.map((c, i) => (
-                                                    <div key={i} className="flex">
-                                                        <img
-                                                            src={c.localUrl}
-                                                            alt={`Capture ${i + 1} - You`}
-                                                            className="w-1/2 aspect-[4/3] rounded-l-lg object-cover"
-                                                            style={{
-                                                                filter:
-                                                                    filter.cssFilter !== "none"
-                                                                        ? filter.cssFilter
-                                                                        : undefined,
-                                                            }}
-                                                        />
-                                                        <img
-                                                            src={c.remoteUrl || ""}
-                                                            alt={`Capture ${i + 1} - Partner`}
-                                                            className={`w-1/2 aspect-[4/3] rounded-r-lg object-cover ${!c.remoteUrl ? "bg-charcoal/50 animate-pulse" : ""}`}
-                                                            style={{
-                                                                filter:
-                                                                    filter.cssFilter !== "none"
-                                                                        ? filter.cssFilter
-                                                                        : undefined,
-                                                            }}
-                                                        />
-                                                    </div>
-                                                ))}
+                                                {captures.map((c, i) => {
+                                                    const leftImg = localSide === "left" ? c.localUrl : (c.remoteUrl || c.localUrl);
+                                                    const rightImg = localSide === "left" ? (c.remoteUrl || c.localUrl) : c.localUrl;
+                                                    
+                                                    return (
+                                                        <div key={i} className="flex">
+                                                            <img
+                                                                src={leftImg}
+                                                                alt={`Capture ${i + 1} - Left`}
+                                                                className="w-1/2 aspect-[4/3] rounded-l-lg object-cover"
+                                                                style={{
+                                                                    filter:
+                                                                        filter.cssFilter !== "none"
+                                                                            ? filter.cssFilter
+                                                                            : undefined,
+                                                                }}
+                                                            />
+                                                            <img
+                                                                src={rightImg}
+                                                                alt={`Capture ${i + 1} - Right`}
+                                                                className={`w-1/2 aspect-[4/3] rounded-r-lg object-cover ${(!c.remoteUrl && !soloMode) ? "bg-charcoal/50 animate-pulse" : ""}`}
+                                                                style={{
+                                                                    filter:
+                                                                        filter.cssFilter !== "none"
+                                                                            ? filter.cssFilter
+                                                                            : undefined,
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
 
                                             <div className="mt-3 text-center">

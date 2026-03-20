@@ -127,6 +127,7 @@ interface BoothStore {
     showDateStamp: boolean;
     borderStyle: "white" | "pink" | "black" | "polaroid";
     selectedTemplate: TemplateId;
+    localSide: "left" | "right";
 
     // Retake request
     retakeRequest: boolean;
@@ -149,6 +150,7 @@ interface BoothStore {
     setShowDateStamp: (show: boolean) => void;
     setBorderStyle: (style: "white" | "pink" | "black" | "polaroid") => void;
     setSelectedTemplate: (template: TemplateId) => void;
+    setLocalSide: (side: "left" | "right") => void;
     setRetakeRequest: (request: boolean) => void;
     resetBooth: () => void;
 }
@@ -170,6 +172,7 @@ export const useBoothStore = create<BoothStore>((set) => ({
     showDateStamp: true,
     borderStyle: "white",
     selectedTemplate: "none",
+    localSide: "left",
     retakeRequest: false,
 
     setRoomId: (id) => set({ roomId: id }),
@@ -195,6 +198,7 @@ export const useBoothStore = create<BoothStore>((set) => ({
     setShowDateStamp: (show) => set({ showDateStamp: show }),
     setBorderStyle: (style) => set({ borderStyle: style }),
     setSelectedTemplate: (template) => set({ selectedTemplate: template }),
+    setLocalSide: (side) => set({ localSide: side }),
     setRetakeRequest: (request) => set({ retakeRequest: request }),
     resetBooth: () =>
         set({

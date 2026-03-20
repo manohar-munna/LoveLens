@@ -19,6 +19,8 @@ import {
     Wifi,
     WifiOff,
     ArrowLeft,
+    ArrowLeftRight,
+    RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -95,6 +97,7 @@ function CameraFeed({
     templateEmoji,
     videoRef,
     onFlipCamera,
+    showFlipButton = false,
 }: {
     stream: MediaStream | null;
     filter: string;
@@ -103,6 +106,7 @@ function CameraFeed({
     templateEmoji?: string;
     videoRef?: React.RefObject<HTMLVideoElement | null>;
     onFlipCamera?: () => void;
+    showFlipButton?: boolean;
 }) {
     const internalRef = useRef<HTMLVideoElement>(null);
     const ref = videoRef || internalRef;
@@ -126,15 +130,17 @@ function CameraFeed({
                 }}
                 className="w-full h-full object-cover"
             />
-            <div className="absolute bottom-2 left-2 bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1 text-xs text-white/80 flex items-center gap-2">
-                <span>{label}</span>
-                {onFlipCamera && (
+            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+                <div className="bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1 text-xs text-white/80 flex items-center gap-2">
+                    <span>{label}</span>
+                </div>
+                {showFlipButton && onFlipCamera && (
                     <button
                         onClick={onFlipCamera}
-                        className="hover:text-pink-light transition-colors ml-1"
+                        className="w-8 h-8 rounded-lg bg-black/50 backdrop-blur-sm text-white hover:text-pink-light transition-colors flex items-center justify-center"
                         title="Flip Camera"
                     >
-                        <RotateCcw size={12} />
+                        <RefreshCw size={14} />
                     </button>
                 )}
             </div>
@@ -258,6 +264,7 @@ export default function BoothRoomPage() {
         localStream,
         remoteStream,
         connectionStatus,
+        localSide,
         setLocalStream,
         setRemoteStream,
         setIsHost,
@@ -266,6 +273,7 @@ export default function BoothRoomPage() {
         setPhase,
         setSelectedFilter,
         setSelectedTemplate,
+        setLocalSide,
         setCountdownValue,
         addCapture,
         setCaptureIndex,
@@ -319,6 +327,14 @@ export default function BoothRoomPage() {
         }
     };
 
+    const toggleSide = () => {
+        const newSide = localSide === "left" ? "right" : "left";
+        setLocalSide(newSide);
+        if (partnerConnected) {
+            sendSyncEvent({ type: "SIDE_CHANGE", side: newSide === "left" ? "right" : "left" });
+        }
+    };
+
     // Initialize camera on mount
     useEffect(() => {
         let mounted = true;
@@ -357,6 +373,8 @@ export default function BoothRoomPage() {
             onRoomJoined: (data) => {
                 console.log("[booth] Room joined:", data);
                 setIsHost(data.isHost);
+                // First user (host) is on the left, second user (guest) is on the right
+                setLocalSide(data.isHost ? "left" : "right");
                 setConnectionStatus(data.memberCount < 2 ? "waiting" : "connecting");
             },
             onRoomFull: () => {
@@ -434,6 +452,8 @@ export default function BoothRoomPage() {
                     setSelectedFilter(data.filterId);
                 } else if (data.type === "TEMPLATE_CHANGE") {
                     setSelectedTemplate(data.filterId as any);
+                } else if (data.type === "SIDE_CHANGE") {
+                    setLocalSide(data.side);
                 } else if (data.type === "RESET") {
                     executeReset();
                 } else if (data.type === "RETAKE_REQUEST") {
@@ -661,6 +681,7 @@ export default function BoothRoomPage() {
                 showDateStamp,
                 borderStyle,
                 selectedTemplate: useBoothStore.getState().selectedTemplate,
+                localSide: useBoothStore.getState().localSide,
             });
 
             setStripCanvas(canvas);
@@ -676,7 +697,7 @@ export default function BoothRoomPage() {
             generateStrip();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [caption, showDateStamp, borderStyle, selectedFilter]);
+    }, [caption, showDateStamp, borderStyle, selectedFilter, localSide]);
 
     // Download strip
     async function handleDownload(format: "png" | "jpg" | "pdf") {
@@ -814,6 +835,74 @@ export default function BoothRoomPage() {
         );
     }
 
+    const localFeed = (
+        <div className="relative">
+            <CameraFeed
+                stream={localStream}
+                filter={filter.cssFilter}
+                label="You 💕"
+                videoRef={localVideoRef}
+                templateEmoji={template?.emoji}
+                onFlipCamera={toggleCamera}
+                showFlipButton={true}
+            />
+            {phase === "countdown" && (
+                <CountdownOverlay value={countdownValue} />
+            )}
+            {showFlash && <FlashOverlay />}
+        </div>
+    );
+
+    const remoteFeed = (
+        <div className="relative">
+            <CameraFeed
+                stream={partnerConnected ? remoteStream : (soloMode ? localStream : null)}
+                filter={filter.cssFilter}
+                label={partnerConnected ? "Partner 💝" : (soloMode ? "You (mirrored)" : "Partner 💝")}
+                videoRef={remoteVideoRef}
+                mirrored={!partnerConnected && !soloMode}
+                templateEmoji={template?.emoji}
+            />
+            {phase === "countdown" && (
+                <CountdownOverlay value={countdownValue} />
+            )}
+            {showFlash && <FlashOverlay />}
+
+            {/* Partner not connected and not in solo mode — show waiting overlay */}
+            {!partnerConnected && !soloMode && (
+                <div className="absolute inset-0 flex items-center justify-center bg-charcoal/80 rounded-xl">
+                    <div className="text-center p-4">
+                        <Heart
+                            size={28}
+                            className="text-pink-primary mx-auto mb-3 animate-pulse"
+                            fill="currentColor"
+                        />
+                        <p className="text-sm text-gray-400 mb-2">
+                            {roomFull
+                                ? "Room is full (2/2)"
+                                : connectionStatus === "connecting"
+                                    ? "Partner is joining..."
+                                    : "Waiting for your partner..."}
+                        </p>
+                        {!roomFull && (
+                            <>
+                                <p className="text-xs text-gray-500 mb-3">
+                                    Share the room code: <span className="font-bold text-pink-light">{roomId}</span>
+                                </p>
+                                <button
+                                    onClick={() => setSoloMode(true)}
+                                    className="btn-secondary text-xs"
+                                >
+                                    Try Solo Mode
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+
     return (
         <div className="gradient-hero min-h-screen flex flex-col">
             {/* Top bar */}
@@ -897,70 +986,28 @@ export default function BoothRoomPage() {
                                     </div>
                                 )}
 
-                                {/* Camera feeds */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
-                                    <div className="relative">
-                                        <CameraFeed
-                                            stream={localStream}
-                                            filter={filter.cssFilter}
-                                            label="You 💕"
-                                            videoRef={localVideoRef}
-                                            templateEmoji={template?.emoji}
-                                            onFlipCamera={toggleCamera}
-                                        />
-                                        {phase === "countdown" && (
-                                            <CountdownOverlay value={countdownValue} />
-                                        )}
-                                        {showFlash && <FlashOverlay />}
-                                    </div>
+                                {/* Camera feeds - Grid modified to stay grid-cols-2 even on mobile */}
+                                <div className="grid grid-cols-2 gap-2 sm:gap-4 relative">
+                                    {localSide === "left" ? (
+                                        <>
+                                            {localFeed}
+                                            {remoteFeed}
+                                        </>
+                                    ) : (
+                                        <>
+                                            {remoteFeed}
+                                            {localFeed}
+                                        </>
+                                    )}
 
-                                    <div className="relative">
-                                        <CameraFeed
-                                            stream={partnerConnected ? remoteStream : (soloMode ? localStream : null)}
-                                            filter={filter.cssFilter}
-                                            label={partnerConnected ? "Partner 💝" : (soloMode ? "You (mirrored)" : "Partner 💝")}
-                                            videoRef={remoteVideoRef}
-                                            mirrored={!partnerConnected && !soloMode}
-                                            templateEmoji={template?.emoji}
-                                        />
-                                        {phase === "countdown" && (
-                                            <CountdownOverlay value={countdownValue} />
-                                        )}
-                                        {showFlash && <FlashOverlay />}
-
-                                        {/* Partner not connected and not in solo mode — show waiting overlay */}
-                                        {!partnerConnected && !soloMode && (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-charcoal/80 rounded-xl">
-                                                <div className="text-center p-4">
-                                                    <Heart
-                                                        size={28}
-                                                        className="text-pink-primary mx-auto mb-3 animate-pulse"
-                                                        fill="currentColor"
-                                                    />
-                                                    <p className="text-sm text-gray-400 mb-2">
-                                                        {roomFull
-                                                            ? "Room is full (2/2)"
-                                                            : connectionStatus === "connecting"
-                                                                ? "Partner is joining..."
-                                                                : "Waiting for your partner..."}
-                                                    </p>
-                                                    {!roomFull && (
-                                                        <>
-                                                            <p className="text-xs text-gray-500 mb-3">
-                                                                Share the room code: <span className="font-bold text-pink-light">{roomId}</span>
-                                                            </p>
-                                                            <button
-                                                                onClick={() => setSoloMode(true)}
-                                                                className="btn-secondary text-xs"
-                                                            >
-                                                                Try Solo Mode
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
+                                    {/* Swap Button */}
+                                    <button
+                                        onClick={toggleSide}
+                                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-white/20 transition-all hover:scale-110 shadow-xl"
+                                        title="Swap Positions"
+                                    >
+                                        <ArrowLeftRight size={18} />
+                                    </button>
                                 </div>
 
                                 {/* Filter carousel */}

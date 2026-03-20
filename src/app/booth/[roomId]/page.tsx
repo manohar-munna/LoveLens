@@ -94,6 +94,7 @@ function CameraFeed({
     mirrored = true,
     templateEmoji,
     videoRef,
+    onFlipCamera,
 }: {
     stream: MediaStream | null;
     filter: string;
@@ -101,6 +102,7 @@ function CameraFeed({
     mirrored?: boolean;
     templateEmoji?: string;
     videoRef?: React.RefObject<HTMLVideoElement | null>;
+    onFlipCamera?: () => void;
 }) {
     const internalRef = useRef<HTMLVideoElement>(null);
     const ref = videoRef || internalRef;
@@ -124,8 +126,17 @@ function CameraFeed({
                 }}
                 className="w-full h-full object-cover"
             />
-            <div className="absolute bottom-2 left-2 bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1 text-xs text-white/80">
-                {label}
+            <div className="absolute bottom-2 left-2 bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1 text-xs text-white/80 flex items-center gap-2">
+                <span>{label}</span>
+                {onFlipCamera && (
+                    <button
+                        onClick={onFlipCamera}
+                        className="hover:text-pink-light transition-colors ml-1"
+                        title="Flip Camera"
+                    >
+                        <RotateCcw size={12} />
+                    </button>
+                )}
             </div>
             {!stream && (
                 <div className="absolute inset-0 flex items-center justify-center bg-charcoal/80">
@@ -282,6 +293,7 @@ export default function BoothRoomPage() {
     const [roomFull, setRoomFull] = useState(false);
     const [roomNotFound, setRoomNotFound] = useState(false);
     const [retakeSent, setRetakeSent] = useState(false);
+    const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
 
     // Queue for photo taken events that arrive before local addCapture()
     const remotePhotoQueue = useRef<Record<number, string>>({});
@@ -290,13 +302,30 @@ export default function BoothRoomPage() {
     const template = TEMPLATES.find((t) => t.id === selectedTemplate)!;
     const partnerConnected = connectionStatus === "connected";
 
+    const toggleCamera = async () => {
+        const newMode = facingMode === "user" ? "environment" : "user";
+        setFacingMode(newMode);
+        
+        if (localStream) {
+            stopStream(localStream);
+        }
+        
+        try {
+            const stream = await initCamera({ facingMode: newMode });
+            setLocalStream(stream);
+        } catch (err) {
+            console.error("Failed to flip camera:", err);
+            setFacingMode(facingMode); // revert state on failure
+        }
+    };
+
     // Initialize camera on mount
     useEffect(() => {
         let mounted = true;
 
         async function start() {
             try {
-                const stream = await initCamera();
+                const stream = await initCamera({ facingMode: "user" });
                 if (mounted) {
                     setLocalStream(stream);
                     setPhase("preview");
@@ -318,34 +347,12 @@ export default function BoothRoomPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // WebRTC + Signaling: connect to partner when local stream is ready
+    // Signaling: connect immediately so sync events are never lost
     useEffect(() => {
-        if (!localStream || !roomId) return;
+        if (!roomId) return;
 
         setConnectionStatus("connecting");
 
-        // Setup WebRTC peer connection
-        const pc = createPeerConnection(localStream, {
-            onRemoteStream: (stream) => {
-                console.log("[booth] Remote stream received");
-                setRemoteStream(stream);
-                setPartnerJoined(true);
-                setConnectionStatus("connected");
-                setSoloMode(false);
-            },
-            onIceCandidate: (candidate) => {
-                sendIceCandidate(candidate.toJSON());
-            },
-            onConnectionStateChange: (state) => {
-                if (state === "disconnected" || state === "failed" || state === "closed") {
-                    setConnectionStatus("waiting");
-                    setPartnerJoined(false);
-                    setRemoteStream(null);
-                }
-            },
-        });
-
-        // Connect to signaling server
         const socket = connectToSignalingServer(roomId, {
             onRoomJoined: (data) => {
                 console.log("[booth] Room joined:", data);
@@ -440,14 +447,42 @@ export default function BoothRoomPage() {
         });
 
         return () => {
-            closePeerConnection();
             disconnectSignaling();
             setConnectionStatus("disconnected");
             setPartnerJoined(false);
-            setRemoteStream(null);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [localStream, roomId]);
+    }, [roomId]);
+
+    // WebRTC: create peer connection only when local stream is ready
+    useEffect(() => {
+        if (!localStream) return;
+
+        const pc = createPeerConnection(localStream, {
+            onRemoteStream: (stream) => {
+                console.log("[booth] Remote stream received");
+                setRemoteStream(stream);
+                setPartnerJoined(true);
+                setConnectionStatus("connected");
+                setSoloMode(false);
+            },
+            onIceCandidate: (candidate) => {
+                sendIceCandidate(candidate.toJSON());
+            },
+            onConnectionStateChange: (state) => {
+                if (state === "disconnected" || state === "failed" || state === "closed") {
+                    setConnectionStatus("waiting");
+                    setPartnerJoined(false);
+                    setRemoteStream(null);
+                }
+            },
+        });
+
+        return () => {
+            closePeerConnection();
+            setRemoteStream(null);
+        };
+    }, [localStream]);
 
     // Cleanup stream on unmount or when transitioning to review phase
     useEffect(() => {
@@ -871,6 +906,7 @@ export default function BoothRoomPage() {
                                             label="You 💕"
                                             videoRef={localVideoRef}
                                             templateEmoji={template?.emoji}
+                                            onFlipCamera={toggleCamera}
                                         />
                                         {phase === "countdown" && (
                                             <CountdownOverlay value={countdownValue} />

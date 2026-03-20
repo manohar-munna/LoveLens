@@ -445,8 +445,6 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transform: scaleX(-1);
-  /* Mirror front camera */
 }
 
 /* ─── Sticker on strip ───────────────────────────────────────────── */

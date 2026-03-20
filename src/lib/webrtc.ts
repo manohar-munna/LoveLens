@@ -122,7 +122,7 @@ export function getPeerConnection(): RTCPeerConnection | null {
     return peerConnection;
 }
 
-export function replaceLocalStream(newStream: MediaStream) {
+export async function replaceLocalStream(newStream: MediaStream) {
     if (!peerConnection) return;
 
     const videoTrack = newStream.getVideoTracks()[0];
@@ -130,7 +130,11 @@ export function replaceLocalStream(newStream: MediaStream) {
     const sender = senders.find((s) => s.track?.kind === "video");
 
     if (sender && videoTrack) {
-        sender.replaceTrack(videoTrack);
+        try {
+            await sender.replaceTrack(videoTrack);
+        } catch (err) {
+            console.error("[webrtc] Failed to replace video track:", err);
+        }
     }
 }
 

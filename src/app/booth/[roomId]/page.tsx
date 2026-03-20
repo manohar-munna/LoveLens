@@ -326,7 +326,7 @@ export default function BoothRoomPage() {
             
             // If connected, replace tracks instead of restarting connection
             if (partnerConnected) {
-                replaceLocalStream(stream);
+                await replaceLocalStream(stream);
             }
             
             // Stop old tracks
@@ -568,6 +568,9 @@ export default function BoothRoomPage() {
                 stopStream(localStreamRef.current);
                 localStreamRef.current = null;
             }
+            // Ensure store state doesn't hold onto stale streams
+            useBoothStore.getState().setLocalStream(null);
+            useBoothStore.getState().setRemoteStream(null);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);

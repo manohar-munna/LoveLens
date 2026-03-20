@@ -100,6 +100,8 @@ function CameraFeed({
     videoRef,
     onFlipCamera,
     showFlipButton = false,
+    zoom = 1,
+    onZoomChange,
 }: {
     stream: MediaStream | null;
     filter: string;
@@ -109,6 +111,8 @@ function CameraFeed({
     videoRef?: React.RefObject<HTMLVideoElement | null>;
     onFlipCamera?: () => void;
     showFlipButton?: boolean;
+    zoom?: number;
+    onZoomChange?: (zoom: number) => void;
 }) {
     const internalRef = useRef<HTMLVideoElement>(null);
     const ref = videoRef || internalRef;
@@ -119,6 +123,58 @@ function CameraFeed({
         }
     }, [stream, ref]);
 
+    useEffect(() => {
+        const video = ref.current;
+        if (!video || !onZoomChange) return;
+
+        let startDistance = 0;
+        let startZoom = 1;
+
+        const handleTouchStart = (e: TouchEvent) => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                startDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                startZoom = zoom;
+            }
+        };
+
+        const handleTouchMove = (e: TouchEvent) => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                const currentDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                const scale = currentDistance / startDistance;
+                let newZoom = startZoom * scale;
+                newZoom = Math.max(0.3, Math.min(newZoom, 4));
+                onZoomChange(newZoom);
+            }
+        };
+
+        const handleWheel = (e: WheelEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                let newZoom = zoom - e.deltaY * 0.01;
+                newZoom = Math.max(0.3, Math.min(newZoom, 4));
+                onZoomChange(newZoom);
+            }
+        };
+
+        video.addEventListener('touchstart', handleTouchStart, { passive: false });
+        video.addEventListener('touchmove', handleTouchMove, { passive: false });
+        video.addEventListener('wheel', handleWheel, { passive: false });
+
+        return () => {
+            video.removeEventListener('touchstart', handleTouchStart);
+            video.removeEventListener('touchmove', handleTouchMove);
+            video.removeEventListener('wheel', handleWheel);
+        };
+    }, [zoom, ref, onZoomChange]);
+
     return (
         <div className="camera-feed relative">
             <video
@@ -128,11 +184,12 @@ function CameraFeed({
                 muted
                 style={{
                     filter: filter !== "none" ? filter : undefined,
-                    transform: mirrored ? "scaleX(-1)" : undefined,
+                    transform: `scale(${mirrored ? -zoom : zoom}, ${zoom})`,
                 }}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover transition-transform duration-75"
             />
             <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+
                 <div className="bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1 text-xs text-white/80 flex items-center gap-2">
                     <span>{label}</span>
                 </div>
@@ -491,9 +548,10 @@ export default function BoothRoomPage() {
 
     // WebRTC: create peer connection only when local stream is ready
     const hasInitialConnection = useRef(false);
+    const isStreamReady = !!localStream;
 
     useEffect(() => {
-        if (!localStream || hasInitialConnection.current) return;
+        if (!isStreamReady || hasInitialConnection.current) return;
 
         console.log("[booth] Creating initial WebRTC connection...");
         const pc = createPeerConnection(localStream, {
@@ -524,7 +582,8 @@ export default function BoothRoomPage() {
             setRemoteStream(null);
             hasInitialConnection.current = false;
         };
-    }, [localStream]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isStreamReady]);
 
     // Cleanup stream on unmount or when transitioning to review phase
     useEffect(() => {
@@ -645,7 +704,7 @@ export default function BoothRoomPage() {
 
         // ALWAYS capture only local video for maximum quality
         const localResult = localVideoRef.current
-            ? captureFrame(localVideoRef.current, currentFilter.cssFilter, shouldMirror)
+            ? captureFrame(localVideoRef.current, currentFilter.cssFilter, shouldMirror, state.localZoom)
             : null;
 
         if (localResult) {

@@ -128,6 +128,7 @@ interface BoothStore {
     borderStyle: "white" | "pink" | "black" | "polaroid";
     selectedTemplate: TemplateId;
     localSide: "left" | "right";
+    localZoom: number;
 
     // Retake request
     retakeRequest: boolean;
@@ -151,6 +152,7 @@ interface BoothStore {
     setBorderStyle: (style: "white" | "pink" | "black" | "polaroid") => void;
     setSelectedTemplate: (template: TemplateId) => void;
     setLocalSide: (side: "left" | "right") => void;
+    setLocalZoom: (zoom: number) => void;
     setRetakeRequest: (request: boolean) => void;
     resetBooth: () => void;
 }
@@ -173,6 +175,7 @@ export const useBoothStore = create<BoothStore>((set) => ({
     borderStyle: "white",
     selectedTemplate: "none",
     localSide: "left",
+    localZoom: 1,
     retakeRequest: false,
 
     setRoomId: (id) => set({ roomId: id }),
@@ -199,6 +202,7 @@ export const useBoothStore = create<BoothStore>((set) => ({
     setBorderStyle: (style) => set({ borderStyle: style }),
     setSelectedTemplate: (template) => set({ selectedTemplate: template }),
     setLocalSide: (side) => set({ localSide: side }),
+    setLocalZoom: (zoom) => set({ localZoom: zoom }),
     setRetakeRequest: (request) => set({ retakeRequest: request }),
     resetBooth: () =>
         set({

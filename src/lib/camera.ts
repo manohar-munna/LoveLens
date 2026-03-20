@@ -68,7 +68,8 @@ export function stopStream(stream: MediaStream | null) {
 export function captureFrame(
     videoElement: HTMLVideoElement,
     filter?: string,
-    mirrored: boolean = true
+    mirrored: boolean = true,
+    zoom: number = 1
 ): { blob: Promise<Blob>; url: string } {
     const canvas = document.createElement("canvas");
     canvas.width = videoElement.videoWidth || 640;
@@ -80,13 +81,13 @@ export function captureFrame(
         ctx.filter = filter;
     }
 
-    if (mirrored) {
-        // Mirror for front camera
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-    }
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.scale(mirrored ? -zoom : zoom, zoom);
+    ctx.translate(-canvas.width / 2, -canvas.height / 2);
     
     ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+    ctx.restore();
 
     const url = canvas.toDataURL("image/jpeg", 0.92);
     const blob = new Promise<Blob>((resolve, reject) => {

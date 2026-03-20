@@ -145,7 +145,7 @@ function CameraFeed({
     }, [showZoomSlider]);
 
     return (
-        <div className="camera-feed relative rounded-xl overflow-hidden aspect-[3/4] sm:aspect-video w-full">
+        <div className="camera-feed relative rounded-xl overflow-hidden aspect-[4/5] sm:aspect-video w-full">
             <video
                 ref={ref}
                 autoPlay
@@ -379,31 +379,37 @@ export default function BoothRoomPage() {
 
     const toggleCamera = async () => {
         const newMode = facingMode === "user" ? "environment" : "user";
-        setFacingMode(newMode);
-        
-        if (partnerConnected) {
-            sendSyncEvent({ type: "FACING_MODE_CHANGE", mode: newMode });
-        }
         
         const oldStream = localStreamRef.current;
+        
+        // Mobile browsers (iOS) often block accessing a second camera while the first is still active.
+        // We must stop the old stream BEFORE requesting the new one.
+        if (oldStream) {
+            stopStream(oldStream);
+            localStreamRef.current = null;
+        }
         
         try {
             const stream = await initCamera({ facingMode: newMode });
             setLocalStream(stream);
             localStreamRef.current = stream;
+            setFacingMode(newMode);
             
-            // If connected, replace tracks instead of restarting connection
             if (partnerConnected) {
+                sendSyncEvent({ type: "FACING_MODE_CHANGE", mode: newMode });
                 await replaceLocalStream(stream);
-            }
-            
-            // Stop old tracks
-            if (oldStream) {
-                stopStream(oldStream);
             }
         } catch (err) {
             console.error("Failed to flip camera:", err);
-            setFacingMode(facingMode); // revert state on failure
+            // If flip fails, try to recover the original camera
+            try {
+                const fallbackStream = await initCamera({ facingMode });
+                setLocalStream(fallbackStream);
+                localStreamRef.current = fallbackStream;
+                if (partnerConnected) await replaceLocalStream(fallbackStream);
+            } catch (recoverErr) {
+                console.error("Failed to recover camera:", recoverErr);
+            }
         }
     };
 
@@ -471,6 +477,17 @@ export default function BoothRoomPage() {
             onPartnerJoined: () => {
                 console.log("[booth] Partner joined");
                 setPartnerJoined(true);
+                // If we are the host, sync our current state to the new guest
+                if (useBoothStore.getState().isHost) {
+                    sendSyncEvent({
+                        type: "SYNC_STATE",
+                        side: useBoothStore.getState().localSide, // Host's side
+                        filterId: useBoothStore.getState().selectedFilter,
+                        templateId: useBoothStore.getState().selectedTemplate,
+                        zoom: useBoothStore.getState().localZoom,
+                        facingMode: facingMode
+                    });
+                }
             },
             onCreateOffer: async () => {
                 try {
@@ -514,7 +531,14 @@ export default function BoothRoomPage() {
             },
             onSyncEvent: (data) => {
                 console.log("[booth] Received sync event:", data);
-                if (data.type === "START_CAPTURE") {
+                if (data.type === "SYNC_STATE") {
+                    // We are guest, host is sending their state. We set our side to the opposite.
+                    setLocalSide(data.side === "left" ? "right" : "left");
+                    setSelectedFilter(data.filterId);
+                    setSelectedTemplate(data.templateId as any);
+                    useBoothStore.getState().setRemoteZoom(data.zoom);
+                    useBoothStore.getState().setRemoteFacingMode(data.facingMode);
+                } else if (data.type === "START_CAPTURE") {
                     setPhase("countdown");
                     setCaptureIndex(0);
                     runCountdown(0);
@@ -614,10 +638,15 @@ export default function BoothRoomPage() {
             } else if (phase === "preview" && !localStreamRef.current) {
                 // Restart camera if we go back to preview (e.g. Retake)
                 try {
-                    const stream = await initCamera();
+                    const stream = await initCamera({ facingMode });
                     if (mounted) {
                         setLocalStream(stream);
                         localStreamRef.current = stream;
+                        
+                        // Fix for: rejoining requires reload. We MUST give the new stream to WebRTC
+                        if (useBoothStore.getState().connectionStatus === "connected") {
+                            await replaceLocalStream(stream);
+                        }
                     } else {
                         stopStream(stream);
                     }

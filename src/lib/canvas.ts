@@ -12,6 +12,7 @@ interface ComposeOptions {
     showDateStamp: boolean;
     borderStyle: "white" | "pink" | "black" | "polaroid";
     selectedTemplate: "none" | "hearts" | "stars" | "crown";
+    localSide: "left" | "right";
 }
 
 const BORDER_COLORS: Record<string, string> = {
@@ -36,7 +37,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 export async function composePhotostrip(
     options: ComposeOptions
 ): Promise<HTMLCanvasElement> {
-    const { captures, filterId, caption, showDateStamp, borderStyle, selectedTemplate } = options;
+    const { captures, filterId, caption, showDateStamp, borderStyle, selectedTemplate, localSide } = options;
     const filter = FILTERS.find((f) => f.id === filterId);
 
     const STRIP_WIDTH = 1200;
@@ -89,13 +90,22 @@ export async function composePhotostrip(
             roundedRect(ctx, BORDER, yOffset, innerWidth, FRAME_HEIGHT, 16);
             ctx.clip();
 
-            // Draw left image (local)
-            drawImageCenter(ctx, localImg, BORDER, yOffset, halfWidth, FRAME_HEIGHT);
+            const leftImg = localSide === "left" ? localImg : remoteImg;
+            const rightImg = localSide === "left" ? remoteImg : localImg;
 
-            // Draw right image (remote) or fallback to local if explicitly requested (solo mode)
-            if (remoteImg) {
-                drawImageCenter(ctx, remoteImg, BORDER + halfWidth, yOffset, halfWidth, FRAME_HEIGHT);
+            // Draw left image
+            if (leftImg) {
+                drawImageCenter(ctx, leftImg, BORDER, yOffset, halfWidth, FRAME_HEIGHT);
             } else {
+                // If remote is missing but should be on left, use local as fallback
+                drawImageCenter(ctx, localImg, BORDER, yOffset, halfWidth, FRAME_HEIGHT);
+            }
+
+            // Draw right image
+            if (rightImg) {
+                drawImageCenter(ctx, rightImg, BORDER + halfWidth, yOffset, halfWidth, FRAME_HEIGHT);
+            } else {
+                // If remote is missing but should be on right, use local as fallback
                 drawImageCenter(ctx, localImg, BORDER + halfWidth, yOffset, halfWidth, FRAME_HEIGHT);
             }
 

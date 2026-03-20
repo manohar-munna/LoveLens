@@ -1000,14 +1000,16 @@ export default function BoothRoomPage() {
                                         </>
                                     )}
 
-                                    {/* Swap Button */}
-                                    <button
-                                        onClick={toggleSide}
-                                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-white/20 transition-all hover:scale-110 shadow-xl"
-                                        title="Swap Positions"
-                                    >
-                                        <ArrowLeftRight size={18} />
-                                    </button>
+                                    {/* Swap Button - Hidden during countdown and capturing */}
+                                    {phase === "preview" && (
+                                        <button
+                                            onClick={toggleSide}
+                                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-white/20 transition-all hover:scale-110 shadow-xl"
+                                            title="Swap Positions"
+                                        >
+                                            <ArrowLeftRight size={18} />
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Filter carousel */}

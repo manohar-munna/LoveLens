@@ -121,3 +121,16 @@ export function closePeerConnection() {
 export function getPeerConnection(): RTCPeerConnection | null {
     return peerConnection;
 }
+
+export function replaceLocalStream(newStream: MediaStream) {
+    if (!peerConnection) return;
+
+    const videoTrack = newStream.getVideoTracks()[0];
+    const senders = peerConnection.getSenders();
+    const sender = senders.find((s) => s.track?.kind === "video");
+
+    if (sender && videoTrack) {
+        sender.replaceTrack(videoTrack);
+    }
+}
+

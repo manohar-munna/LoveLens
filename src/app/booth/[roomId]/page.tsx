@@ -55,10 +55,12 @@ import {
     handleAnswer as rtcHandleAnswer,
     addIceCandidate as rtcAddIceCandidate,
     closePeerConnection,
+    replaceLocalStream,
 } from "@/lib/webrtc";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 // ─── Countdown Overlay ─────────────────────────────────────────
+// ... rest of code (I will use surgical replacement for specific parts)
 function CountdownOverlay({ value }: { value: number }) {
     return (
         <motion.div
@@ -288,6 +290,7 @@ export default function BoothRoomPage() {
 
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
+    const localStreamRef = useRef<MediaStream | null>(null);
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [showFlash, setShowFlash] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -314,13 +317,22 @@ export default function BoothRoomPage() {
         const newMode = facingMode === "user" ? "environment" : "user";
         setFacingMode(newMode);
         
-        if (localStream) {
-            stopStream(localStream);
-        }
+        const oldStream = localStreamRef.current;
         
         try {
             const stream = await initCamera({ facingMode: newMode });
             setLocalStream(stream);
+            localStreamRef.current = stream;
+            
+            // If connected, replace tracks instead of restarting connection
+            if (partnerConnected) {
+                replaceLocalStream(stream);
+            }
+            
+            // Stop old tracks
+            if (oldStream) {
+                stopStream(oldStream);
+            }
         } catch (err) {
             console.error("Failed to flip camera:", err);
             setFacingMode(facingMode); // revert state on failure
@@ -344,7 +356,10 @@ export default function BoothRoomPage() {
                 const stream = await initCamera({ facingMode: "user" });
                 if (mounted) {
                     setLocalStream(stream);
+                    localStreamRef.current = stream;
                     setPhase("preview");
+                } else {
+                    stopStream(stream);
                 }
             } catch (err) {
                 if (mounted) {
@@ -475,9 +490,12 @@ export default function BoothRoomPage() {
     }, [roomId]);
 
     // WebRTC: create peer connection only when local stream is ready
-    useEffect(() => {
-        if (!localStream) return;
+    const hasInitialConnection = useRef(false);
 
+    useEffect(() => {
+        if (!localStream || hasInitialConnection.current) return;
+
+        console.log("[booth] Creating initial WebRTC connection...");
         const pc = createPeerConnection(localStream, {
             onRemoteStream: (stream) => {
                 console.log("[booth] Remote stream received");
@@ -494,13 +512,17 @@ export default function BoothRoomPage() {
                     setConnectionStatus("waiting");
                     setPartnerJoined(false);
                     setRemoteStream(null);
+                    hasInitialConnection.current = false; // Allow reconnection
                 }
             },
         });
 
+        hasInitialConnection.current = true;
+
         return () => {
             closePeerConnection();
             setRemoteStream(null);
+            hasInitialConnection.current = false;
         };
     }, [localStream]);
 
@@ -510,16 +532,20 @@ export default function BoothRoomPage() {
 
         async function handlePhaseChange() {
             if (phase === "review" || phase === "customizing" || phase === "exporting") {
-                if (localStream) {
-                    stopStream(localStream);
+                if (localStreamRef.current) {
+                    stopStream(localStreamRef.current);
                     setLocalStream(null);
+                    localStreamRef.current = null;
                 }
-            } else if (phase === "preview" && !localStream) {
+            } else if (phase === "preview" && !localStreamRef.current) {
                 // Restart camera if we go back to preview (e.g. Retake)
                 try {
                     const stream = await initCamera();
                     if (mounted) {
                         setLocalStream(stream);
+                        localStreamRef.current = stream;
+                    } else {
+                        stopStream(stream);
                     }
                 } catch (err) {
                     // Ignore on unmount
@@ -538,7 +564,10 @@ export default function BoothRoomPage() {
     // Cleanup strictly on unmount
     useEffect(() => {
         return () => {
-            if (localStream) stopStream(localStream);
+            if (localStreamRef.current) {
+                stopStream(localStreamRef.current);
+                localStreamRef.current = null;
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -608,9 +637,12 @@ export default function BoothRoomPage() {
         const isPartnerConnected = state.connectionStatus === "connected";
         const isSoloMode = soloModeRef.current;
 
+        // ONLY mirror for front camera
+        const shouldMirror = facingMode === "user";
+
         // ALWAYS capture only local video for maximum quality
         const localResult = localVideoRef.current
-            ? captureFrame(localVideoRef.current, currentFilter.cssFilter)
+            ? captureFrame(localVideoRef.current, currentFilter.cssFilter, shouldMirror)
             : null;
 
         if (localResult) {
@@ -845,6 +877,7 @@ export default function BoothRoomPage() {
                 templateEmoji={template?.emoji}
                 onFlipCamera={toggleCamera}
                 showFlipButton={true}
+                mirrored={facingMode === "user"}
             />
             {phase === "countdown" && (
                 <CountdownOverlay value={countdownValue} />
@@ -860,7 +893,7 @@ export default function BoothRoomPage() {
                 filter={filter.cssFilter}
                 label={partnerConnected ? "Partner 💝" : (soloMode ? "You (mirrored)" : "Partner 💝")}
                 videoRef={remoteVideoRef}
-                mirrored={!partnerConnected && !soloMode}
+                mirrored={partnerConnected ? false : (soloMode ? (facingMode === "user") : true)}
                 templateEmoji={template?.emoji}
             />
             {phase === "countdown" && (

@@ -372,6 +372,7 @@ export default function BoothRoomPage() {
     const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
     const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
     const [showCountMenu, setShowCountMenu] = useState(false);
+    const [pcTrigger, setPcTrigger] = useState(0);
 
     // Queue for photo taken events that arrive before local addCapture()
     const remotePhotoQueue = useRef<Record<number, string>>({});
@@ -473,6 +474,7 @@ export default function BoothRoomPage() {
     useEffect(() => {
         if (!roomId) return;
 
+        resetBooth();
         setConnectionStatus("connecting");
 
         const socket = connectToSignalingServer(roomId, {
@@ -549,6 +551,8 @@ export default function BoothRoomPage() {
                 setPartnerJoined(false);
                 setRemoteStream(null);
                 setConnectionStatus("waiting");
+                closePeerConnection();
+                setPcTrigger(prev => prev + 1);
             },
             onSyncEvent: (data) => {
                 console.log("[booth] Received sync event:", data);
@@ -643,7 +647,7 @@ export default function BoothRoomPage() {
             hasInitialConnection.current = false;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isStreamReady]);
+    }, [isStreamReady, pcTrigger]);
 
     // Cleanup stream on unmount or when transitioning to review phase
     useEffect(() => {
@@ -853,11 +857,11 @@ export default function BoothRoomPage() {
 
     // Re-generate when customization changes
     useEffect(() => {
-        if (phase === "customizing" && captures.length === useBoothStore.getState().maxCaptures) {
+        if (phase === "customizing") {
             generateStrip();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [caption, showDateStamp, borderStyle, selectedFilter, localSide, textSize]);
+    }, [caption, showDateStamp, borderStyle, selectedFilter, localSide, textSize, captures]);
 
     // Download strip
     async function handleDownload(format: "png" | "jpg" | "pdf") {
@@ -1175,13 +1179,13 @@ export default function BoothRoomPage() {
                                 <div className="grid grid-cols-2 gap-2 sm:gap-4 relative">
                                     {localSide === "left" ? (
                                         <>
-                                            {localFeed}
-                                            {remoteFeed}
+                                            <div key="left-local">{localFeed}</div>
+                                            <div key="right-remote">{remoteFeed}</div>
                                         </>
                                     ) : (
                                         <>
-                                            {remoteFeed}
-                                            {localFeed}
+                                            <div key="left-remote">{remoteFeed}</div>
+                                            <div key="right-local">{localFeed}</div>
                                         </>
                                     )}
 
@@ -1311,7 +1315,7 @@ export default function BoothRoomPage() {
                                                     const rightImg = localSide === "left" ? (c.remoteUrl || c.localUrl) : c.localUrl;
                                                     
                                                     return (
-                                                        <div key={i} className="flex">
+                                                        <div key={i} className="flex relative group">
                                                             <img
                                                                 src={leftImg}
                                                                 alt={`Capture ${i + 1} - Left`}
@@ -1334,6 +1338,16 @@ export default function BoothRoomPage() {
                                                                             : undefined,
                                                                 }}
                                                             />
+                                                            <button
+                                                                onClick={() => {
+                                                                    const newCaptures = captures.filter((_, index) => index !== i);
+                                                                    setCaptures(newCaptures);
+                                                                }}
+                                                                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all z-10"
+                                                                title="Delete this capture"
+                                                            >
+                                                                <X size={16} />
+                                                            </button>
                                                         </div>
                                                     );
                                                 })}

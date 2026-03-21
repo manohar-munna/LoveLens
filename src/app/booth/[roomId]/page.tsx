@@ -371,7 +371,7 @@ export default function BoothRoomPage() {
     const [retakeSent, setRetakeSent] = useState(false);
     const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
     const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
-    const [isRotated, setIsRotated] = useState(false);
+    const [showCountMenu, setShowCountMenu] = useState(false);
 
     // Queue for photo taken events that arrive before local addCapture()
     const remotePhotoQueue = useRef<Record<number, string>>({});
@@ -432,8 +432,9 @@ export default function BoothRoomPage() {
             try {
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const videoInputs = devices.filter(device => device.kind === 'videoinput');
+                const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
                 if (mounted) {
-                    setHasMultipleCameras(videoInputs.length > 1);
+                    setHasMultipleCameras(videoInputs.length > 1 && isMobile);
                 }
             } catch (err) {
                 console.error("Failed to enumerate devices:", err);
@@ -833,6 +834,7 @@ export default function BoothRoomPage() {
                 filterId: selectedFilter,
                 caption,
                 showDateStamp,
+                textSize,
                 borderStyle,
                 selectedTemplate: useBoothStore.getState().selectedTemplate,
                 localSide: useBoothStore.getState().localSide,
@@ -1200,31 +1202,54 @@ export default function BoothRoomPage() {
                                 </div>
 
                                 {/* Filter carousel */}
-                                <div className="mt-5">
-                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                                        <FilterCarousel
-                                            selected={selectedFilter}
-                                            onSelect={handleFilterSelect}
-                                        />
+                                <div className="mt-5 w-full overflow-hidden">
+                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
+                                        <div className="w-full sm:w-auto overflow-hidden">
+                                            <FilterCarousel
+                                                selected={selectedFilter}
+                                                onSelect={handleFilterSelect}
+                                            />
+                                        </div>
 
                                         {/* Capture Count Selector */}
-                                        <div className="glass px-3 py-1.5 rounded-xl border border-white/5 flex items-center gap-2">
-                                            <label className="text-xs text-gray-400 whitespace-nowrap">Photos:</label>
-                                            <select
-                                                value={useBoothStore.getState().maxCaptures}
-                                                onChange={(e) => {
-                                                    const count = Number(e.target.value);
-                                                    useBoothStore.getState().setMaxCaptures(count);
-                                                    if (partnerConnected) {
-                                                        sendSyncEvent({ type: "CAPTURE_COUNT_CHANGE", count });
-                                                    }
-                                                }}
-                                                className="bg-transparent text-sm text-pink-light font-bold outline-none cursor-pointer"
+                                        <div className="relative">
+                                            <button
+                                                onClick={() => setShowCountMenu(!showCountMenu)}
+                                                className="glass px-3 py-1.5 rounded-xl border border-white/5 flex items-center gap-2 hover:bg-white/5 transition-colors"
                                             >
-                                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
-                                                    <option key={num} value={num} className="bg-charcoal text-white">{num}</option>
-                                                ))}
-                                            </select>
+                                                <span className="text-xs text-gray-400 whitespace-nowrap">Photos:</span>
+                                                <span className="text-sm text-pink-light font-bold flex items-center gap-1">
+                                                    {useBoothStore.getState().maxCaptures}
+                                                    <span className="text-[10px]">▼</span>
+                                                </span>
+                                            </button>
+                                            
+                                            <AnimatePresence>
+                                                {showCountMenu && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, y: -10 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0, y: -10 }}
+                                                        className="absolute bottom-full right-0 mb-2 w-32 bg-charcoal border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 grid grid-cols-2 gap-1 p-2"
+                                                    >
+                                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                                                            <button
+                                                                key={num}
+                                                                onClick={() => {
+                                                                    useBoothStore.getState().setMaxCaptures(num);
+                                                                    if (partnerConnected) {
+                                                                        sendSyncEvent({ type: "CAPTURE_COUNT_CHANGE", count: num });
+                                                                    }
+                                                                    setShowCountMenu(false);
+                                                                }}
+                                                                className={`py-1.5 rounded-lg text-sm font-medium transition-colors ${useBoothStore.getState().maxCaptures === num ? "bg-pink-primary text-white" : "text-gray-300 hover:bg-white/10"}`}
+                                                            >
+                                                                {num}
+                                                            </button>
+                                                        ))}
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
                                         </div>
                                     </div>
                                 </div>

@@ -504,6 +504,10 @@ export default function BoothRoomPage() {
                         zoom: useBoothStore.getState().localZoom,
                         facingMode: facingMode
                     });
+                    sendSyncEvent({
+                        type: "CAPTURE_COUNT_CHANGE",
+                        count: useBoothStore.getState().maxCaptures
+                    });
                 }
             },
             onCreateOffer: async () => {
@@ -1222,7 +1226,7 @@ export default function BoothRoomPage() {
                                                         initial={{ opacity: 0, y: -10 }}
                                                         animate={{ opacity: 1, y: 0 }}
                                                         exit={{ opacity: 0, y: -10 }}
-                                                        className="absolute bottom-full right-0 mb-2 w-32 bg-charcoal border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 grid grid-cols-2 gap-1 p-2"
+                                                        className="absolute top-full right-0 mt-2 w-32 bg-charcoal border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 grid grid-cols-2 gap-1 p-2"
                                                     >
                                                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
                                                             <button

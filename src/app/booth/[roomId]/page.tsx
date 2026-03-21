@@ -1198,9 +1198,9 @@ export default function BoothRoomPage() {
                                 </div>
 
                                 {/* Filter carousel */}
-                                <div className="mt-5 w-full overflow-hidden">
+                                <div className="mt-5 w-full">
                                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
-                                        <div className="w-full sm:w-auto overflow-hidden">
+                                        <div className="w-full sm:w-auto">
                                             <FilterCarousel
                                                 selected={selectedFilter}
                                                 onSelect={handleFilterSelect}

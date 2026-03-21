@@ -125,6 +125,7 @@ interface BoothStore {
     // Customization
     caption: string;
     showDateStamp: boolean;
+    textSize: number;
     borderStyle: "white" | "pink" | "black" | "polaroid";
     selectedTemplate: TemplateId;
     localSide: "left" | "right";
@@ -151,6 +152,7 @@ interface BoothStore {
     setMaxCaptures: (count: number) => void;
     setCaption: (caption: string) => void;
     setShowDateStamp: (show: boolean) => void;
+    setTextSize: (size: number) => void;
     setBorderStyle: (style: "white" | "pink" | "black" | "polaroid") => void;
     setSelectedTemplate: (template: TemplateId) => void;
     setLocalSide: (side: "left" | "right") => void;
@@ -176,6 +178,7 @@ export const useBoothStore = create<BoothStore>((set) => ({
     maxCaptures: 3,
     caption: "",
     showDateStamp: true,
+    textSize: 1,
     borderStyle: "white",
     selectedTemplate: "none",
     localSide: "left",
@@ -205,6 +208,7 @@ export const useBoothStore = create<BoothStore>((set) => ({
     setMaxCaptures: (count) => set({ maxCaptures: count }),
     setCaption: (caption) => set({ caption }),
     setShowDateStamp: (show) => set({ showDateStamp: show }),
+    setTextSize: (size) => set({ textSize: size }),
     setBorderStyle: (style) => set({ borderStyle: style }),
     setSelectedTemplate: (template) => set({ selectedTemplate: template }),
     setLocalSide: (side) => set({ localSide: side }),

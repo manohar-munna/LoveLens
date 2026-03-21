@@ -180,7 +180,7 @@ function CameraFeed({
                                 <span className="text-[10px] text-gray-400 font-medium tracking-wider uppercase">Zoom Level</span>
                                 <input 
                                     type="range" 
-                                    min="0.5" 
+                                    min="1" 
                                     max="3" 
                                     step="0.1" 
                                     value={zoom} 
@@ -323,6 +323,7 @@ export default function BoothRoomPage() {
         captureIndex,
         caption,
         showDateStamp,
+        textSize,
         borderStyle,
         localStream,
         remoteStream,
@@ -344,6 +345,7 @@ export default function BoothRoomPage() {
         setCaptureIndex,
         setCaption,
         setShowDateStamp,
+        setTextSize,
         setBorderStyle,
         retakeRequest,
         setRetakeRequest,
@@ -368,6 +370,7 @@ export default function BoothRoomPage() {
     const [roomNotFound, setRoomNotFound] = useState(false);
     const [retakeSent, setRetakeSent] = useState(false);
     const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+    const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
     const [isRotated, setIsRotated] = useState(false);
 
     // Queue for photo taken events that arrive before local addCapture()
@@ -425,8 +428,21 @@ export default function BoothRoomPage() {
     useEffect(() => {
         let mounted = true;
 
+        async function checkDevices() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoInputs = devices.filter(device => device.kind === 'videoinput');
+                if (mounted) {
+                    setHasMultipleCameras(videoInputs.length > 1);
+                }
+            } catch (err) {
+                console.error("Failed to enumerate devices:", err);
+            }
+        }
+
         async function start() {
             try {
+                await checkDevices();
                 const stream = await initCamera({ facingMode: "user" });
                 if (mounted) {
                     setLocalStream(stream);
@@ -835,7 +851,7 @@ export default function BoothRoomPage() {
             generateStrip();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [caption, showDateStamp, borderStyle, selectedFilter, localSide]);
+    }, [caption, showDateStamp, borderStyle, selectedFilter, localSide, textSize]);
 
     // Download strip
     async function handleDownload(format: "png" | "jpg" | "pdf") {
@@ -993,7 +1009,7 @@ export default function BoothRoomPage() {
                 videoRef={localVideoRef}
                 templateEmoji={template?.emoji}
                 onFlipCamera={toggleCamera}
-                showFlipButton={true}
+                showFlipButton={hasMultipleCameras}
                 mirrored={facingMode === "user"}
                 zoom={localZoom}
                 onZoomChange={handleZoomChange}
@@ -1358,6 +1374,23 @@ export default function BoothRoomPage() {
                                                         }`}
                                                 />
                                             </button>
+                                        </div>
+
+                                        {/* Text Size */}
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-sm text-gray-400 flex items-center gap-1.5">
+                                                <Type size={14} />
+                                                Text Size
+                                            </label>
+                                            <input 
+                                                type="range" 
+                                                min="0.8" 
+                                                max="2.5" 
+                                                step="0.1" 
+                                                value={textSize}
+                                                onChange={(e) => setTextSize(parseFloat(e.target.value))}
+                                                className="w-24 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-pink-primary"
+                                            />
                                         </div>
 
                                         {/* Border style */}

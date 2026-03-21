@@ -10,6 +10,7 @@ interface ComposeOptions {
     filterId: FilterId;
     caption: string;
     showDateStamp: boolean;
+    textSize?: number;
     borderStyle: "white" | "pink" | "black" | "polaroid";
     selectedTemplate: "none" | "hearts" | "stars" | "crown";
     localSide: "left" | "right";
@@ -152,17 +153,19 @@ export async function composePhotostrip(
     ctx.textAlign = "center";
     ctx.fillText("♥ LoveLens", STRIP_WIDTH / 2, footerY + 20);
 
+    const sizeMultiplier = options.textSize || 1;
+
     // Caption
     if (caption) {
         ctx.fillStyle = borderStyle === "black" ? "#DDD" : "#555";
-        ctx.font = "bold 18px 'Outfit', sans-serif";
+        ctx.font = `bold ${Math.round(18 * sizeMultiplier)}px 'Outfit', sans-serif`;
         ctx.fillText(caption, STRIP_WIDTH / 2, footerY + 44);
     }
 
     // Date stamp
     if (showDateStamp) {
         ctx.fillStyle = borderStyle === "black" ? "#666" : "#AAA";
-        ctx.font = "12px 'Courier New', monospace";
+        ctx.font = `${Math.round(12 * sizeMultiplier)}px 'Courier New', monospace`;
         ctx.fillText(
             new Date().toLocaleDateString("en-US", {
                 year: "numeric",
@@ -170,7 +173,7 @@ export async function composePhotostrip(
                 day: "numeric",
             }),
             STRIP_WIDTH / 2,
-            footerY + 62
+            footerY + 62 + (sizeMultiplier > 1 && caption ? (sizeMultiplier - 1) * 10 : 0)
         );
     }
 

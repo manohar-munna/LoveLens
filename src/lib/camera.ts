@@ -20,7 +20,11 @@ const DEFAULT_CONFIG: CameraConfig = {
 export async function initCamera(
     config: CameraConfig = {}
 ): Promise<MediaStream> {
-    const mergedConfig = { ...DEFAULT_CONFIG, ...config };
+    const isPortrait = typeof window !== "undefined" && window.innerHeight > window.innerWidth;
+    const defaultWidth = isPortrait ? 720 : 1280;
+    const defaultHeight = isPortrait ? 1280 : 720;
+    
+    const mergedConfig = { width: defaultWidth, height: defaultHeight, facingMode: "user", frameRate: 30, ...config };
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({

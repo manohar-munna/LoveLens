@@ -30,6 +30,7 @@ import {
     useBoothStore,
     FILTERS,
     TEMPLATES,
+    FONTS,
     type FilterId,
     type CapturedFrame,
 } from "@/stores/booth-store";
@@ -373,8 +374,22 @@ export default function BoothRoomPage() {
     const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
     const [showCountMenu, setShowCountMenu] = useState(false);
     const [pcTrigger, setPcTrigger] = useState(0);
+    const [deletedCaptures, setDeletedCaptures] = useState<{index: number, capture: CapturedFrame}[]>([]);
 
-    // Queue for photo taken events that arrive before local addCapture()
+    const handleRestoreCapture = () => {
+        if (deletedCaptures.length === 0) return;
+        
+        const lastDeleted = deletedCaptures[deletedCaptures.length - 1];
+        const newDeletedCaptures = deletedCaptures.slice(0, -1);
+        setDeletedCaptures(newDeletedCaptures);
+
+        setCaptures((prev) => {
+            const newCaptures = [...prev];
+            // Insert it back roughly where it was
+            newCaptures.splice(lastDeleted.index, 0, lastDeleted.capture);
+            return newCaptures;
+        });
+    };
     const remotePhotoQueue = useRef<Record<number, string>>({});
 
     const filter = FILTERS.find((f) => f.id === selectedFilter)!;
@@ -615,7 +630,7 @@ export default function BoothRoomPage() {
     const isStreamReady = !!localStream;
 
     useEffect(() => {
-        if (!isStreamReady || hasInitialConnection.current) return;
+        if (!isStreamReady) return;
 
         console.log("[booth] Creating initial WebRTC connection...");
         const pc = createPeerConnection(localStream, {
@@ -843,6 +858,7 @@ export default function BoothRoomPage() {
                 caption,
                 showDateStamp,
                 textSize,
+                fontFamily: useBoothStore.getState().fontFamily,
                 borderStyle,
                 selectedTemplate: useBoothStore.getState().selectedTemplate,
                 localSide: useBoothStore.getState().localSide,
@@ -1338,20 +1354,34 @@ export default function BoothRoomPage() {
                                                                             : undefined,
                                                                 }}
                                                             />
-                                                            <button
-                                                                onClick={() => {
-                                                                    const newCaptures = captures.filter((_, index) => index !== i);
-                                                                    setCaptures(newCaptures);
-                                                                }}
-                                                                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all z-10"
-                                                                title="Delete this capture"
-                                                            >
-                                                                <X size={16} />
-                                                            </button>
+                                                            <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-all z-10">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setDeletedCaptures([...deletedCaptures, { index: i, capture: c }]);
+                                                                        const newCaptures = captures.filter((_, index) => index !== i);
+                                                                        useBoothStore.getState().setCaptures(newCaptures);
+                                                                    }}
+                                                                    className="w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-red-500 transition-colors"
+                                                                    title="Delete this capture"
+                                                                >
+                                                                    <X size={16} />
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     );
                                                 })}
                                             </div>
+
+                                            {deletedCaptures.length > 0 && (
+                                                <div className="mt-2 text-right">
+                                                    <button
+                                                        onClick={handleRestoreCapture}
+                                                        className="text-xs text-gray-400 hover:text-white flex items-center justify-end gap-1 w-full"
+                                                    >
+                                                        <RotateCcw size={12} /> Undo Delete
+                                                    </button>
+                                                </div>
+                                            )}
 
                                             <div className="mt-3 text-center">
                                                 <button
@@ -1426,6 +1456,31 @@ export default function BoothRoomPage() {
                                                 onChange={(e) => setTextSize(parseFloat(e.target.value))}
                                                 className="w-24 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-pink-primary"
                                             />
+                                        </div>
+
+                                        {/* Font Family */}
+                                        <div>
+                                            <label className="text-sm text-gray-400 mb-2 flex items-center gap-1.5">
+                                                <Type size={14} />
+                                                Font Style
+                                            </label>
+                                            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                                                {(
+                                                    FONTS
+                                                ).map((font) => (
+                                                    <button
+                                                        key={font.id}
+                                                        onClick={() => useBoothStore.getState().setFontFamily(font.id as any)}
+                                                        className={`px-3 py-1.5 rounded-lg text-sm transition-colors whitespace-nowrap ${useBoothStore.getState().fontFamily === font.id
+                                                            ? "bg-pink-primary text-white font-medium"
+                                                            : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-200"
+                                                        }`}
+                                                        style={{ fontFamily: font.family }}
+                                                    >
+                                                        {font.name}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
 
                                         {/* Border style */}

@@ -81,6 +81,22 @@ export type BoothPhase =
 
 export type TemplateId = "none" | "hearts" | "stars" | "crown";
 
+export type FontId = "outfit" | "dancing" | "pacifico" | "caveat" | "vt323";
+
+export interface FontDef {
+    id: FontId;
+    name: string;
+    family: string;
+}
+
+export const FONTS: FontDef[] = [
+    { id: "outfit", name: "Modern", family: "'Outfit', sans-serif" },
+    { id: "dancing", name: "Dancing", family: "'Dancing Script', cursive" },
+    { id: "pacifico", name: "Pacifico", family: "'Pacifico', cursive" },
+    { id: "caveat", name: "Caveat", family: "'Caveat', cursive" },
+    { id: "vt323", name: "Retro", family: "'VT323', monospace" }
+];
+
 export interface TemplateDef {
     id: TemplateId;
     name: string;
@@ -126,6 +142,7 @@ interface BoothStore {
     caption: string;
     showDateStamp: boolean;
     textSize: number;
+    fontFamily: FontId;
     borderStyle: "white" | "pink" | "black" | "polaroid";
     selectedTemplate: TemplateId;
     localSide: "left" | "right";
@@ -153,6 +170,7 @@ interface BoothStore {
     setCaption: (caption: string) => void;
     setShowDateStamp: (show: boolean) => void;
     setTextSize: (size: number) => void;
+    setFontFamily: (font: FontId) => void;
     setBorderStyle: (style: "white" | "pink" | "black" | "polaroid") => void;
     setSelectedTemplate: (template: TemplateId) => void;
     setLocalSide: (side: "left" | "right") => void;
@@ -179,6 +197,7 @@ export const useBoothStore = create<BoothStore>((set) => ({
     caption: "",
     showDateStamp: true,
     textSize: 1,
+    fontFamily: "outfit",
     borderStyle: "white",
     selectedTemplate: "none",
     localSide: "left",
@@ -209,6 +228,7 @@ export const useBoothStore = create<BoothStore>((set) => ({
     setCaption: (caption) => set({ caption }),
     setShowDateStamp: (show) => set({ showDateStamp: show }),
     setTextSize: (size) => set({ textSize: size }),
+    setFontFamily: (font: FontId) => set({ fontFamily: font }),
     setBorderStyle: (style) => set({ borderStyle: style }),
     setSelectedTemplate: (template) => set({ selectedTemplate: template }),
     setLocalSide: (side) => set({ localSide: side }),

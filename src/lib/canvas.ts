@@ -3,7 +3,7 @@
  * Renders 4 side-by-side capture pairs into a photobooth strip
  */
 
-import { FILTERS, type FilterId } from "@/stores/booth-store";
+import { FILTERS, type FilterId, type FontId } from "@/stores/booth-store";
 
 interface ComposeOptions {
     captures: { localUrl: string; remoteUrl: string }[];
@@ -11,6 +11,7 @@ interface ComposeOptions {
     caption: string;
     showDateStamp: boolean;
     textSize?: number;
+    fontFamily?: FontId;
     borderStyle: "white" | "pink" | "black" | "polaroid";
     selectedTemplate: "none" | "hearts" | "stars" | "crown";
     localSide: "left" | "right";
@@ -147,25 +148,26 @@ export async function composePhotostrip(
     // Footer
     const footerY = totalHeight - FOOTER_HEIGHT;
 
+    const sizeMultiplier = options.textSize || 1;
+    const fontFamilyStr = options.fontFamily ? getFontFamilyString(options.fontFamily) : "'Outfit', sans-serif";
+
     // LoveLens branding
     ctx.fillStyle = borderStyle === "black" ? "#888" : "#999";
-    ctx.font = "14px 'Inter', sans-serif";
+    ctx.font = `${Math.round(14 * sizeMultiplier)}px ${fontFamilyStr}`;
     ctx.textAlign = "center";
     ctx.fillText("♥ LoveLens", STRIP_WIDTH / 2, footerY + 20);
-
-    const sizeMultiplier = options.textSize || 1;
 
     // Caption
     if (caption) {
         ctx.fillStyle = borderStyle === "black" ? "#DDD" : "#555";
-        ctx.font = `bold ${Math.round(18 * sizeMultiplier)}px 'Outfit', sans-serif`;
+        ctx.font = `bold ${Math.round(18 * sizeMultiplier)}px ${fontFamilyStr}`;
         ctx.fillText(caption, STRIP_WIDTH / 2, footerY + 44);
     }
 
     // Date stamp
     if (showDateStamp) {
         ctx.fillStyle = borderStyle === "black" ? "#666" : "#AAA";
-        ctx.font = `${Math.round(12 * sizeMultiplier)}px 'Courier New', monospace`;
+        ctx.font = `${Math.round(12 * sizeMultiplier)}px ${fontFamilyStr}`;
         ctx.fillText(
             new Date().toLocaleDateString("en-US", {
                 year: "numeric",
@@ -178,6 +180,17 @@ export async function composePhotostrip(
     }
 
     return canvas;
+}
+
+function getFontFamilyString(fontId: string): string {
+    switch (fontId) {
+        case "dancing": return "'Dancing Script', cursive";
+        case "pacifico": return "'Pacifico', cursive";
+        case "caveat": return "'Caveat', cursive";
+        case "vt323": return "'VT323', monospace";
+        case "outfit":
+        default: return "'Outfit', sans-serif";
+    }
 }
 
 function roundedRect(

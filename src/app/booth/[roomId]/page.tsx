@@ -1100,14 +1100,6 @@ export default function BoothRoomPage() {
                 </div>
 
                 <div className="flex items-center gap-2 sm:gap-3">
-                    <button
-                        onClick={() => setIsRotated(!isRotated)}
-                        className="glass rounded-lg px-2 sm:px-3 py-1.5 text-xs flex items-center gap-1 hover:border-pink-primary/30 transition-colors"
-                        title="Rotate Screen"
-                    >
-                        <Smartphone size={12} className={isRotated ? "rotate-90 transition-transform" : "transition-transform"} />
-                        <span className="hidden sm:inline">Rotate</span>
-                    </button>
                     <div className="glass rounded-lg px-2 sm:px-3 py-1.5 text-xs font-mono tracking-wider hidden sm:block" style={{ color: 'var(--text-secondary)' }}>
                         Room: {roomId}
                     </div>

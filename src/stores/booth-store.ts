@@ -146,6 +146,7 @@ interface BoothStore {
     fontFamily: FontId;
     borderStyle: "white" | "pink" | "black" | "polaroid";
     selectedTemplate: TemplateId;
+    heartFormationLayout: "4-frame" | "9-frame";
     localSide: "left" | "right";
     localZoom: number;
     remoteZoom: number;
@@ -174,6 +175,7 @@ interface BoothStore {
     setFontFamily: (font: FontId) => void;
     setBorderStyle: (style: "white" | "pink" | "black" | "polaroid") => void;
     setSelectedTemplate: (template: TemplateId) => void;
+    setHeartFormationLayout: (layout: "4-frame" | "9-frame") => void;
     setLocalSide: (side: "left" | "right") => void;
     setLocalZoom: (zoom: number) => void;
     setRemoteZoom: (zoom: number) => void;
@@ -201,6 +203,7 @@ export const useBoothStore = create<BoothStore>((set) => ({
     fontFamily: "outfit",
     borderStyle: "white",
     selectedTemplate: "none",
+    heartFormationLayout: "4-frame",
     localSide: "left",
     localZoom: 1,
     remoteZoom: 1,
@@ -232,6 +235,7 @@ export const useBoothStore = create<BoothStore>((set) => ({
     setFontFamily: (font: FontId) => set({ fontFamily: font }),
     setBorderStyle: (style) => set({ borderStyle: style }),
     setSelectedTemplate: (template) => set({ selectedTemplate: template }),
+    setHeartFormationLayout: (layout) => set({ heartFormationLayout: layout }),
     setLocalSide: (side) => set({ localSide: side }),
     setLocalZoom: (zoom) => set({ localZoom: zoom }),
     setRemoteZoom: (zoom) => set({ remoteZoom: zoom }),

@@ -303,28 +303,79 @@ function TemplateCarousel({
 }
 
 // ─── Heart Formation Stencil ────────────────────────────────────
-function HeartFormationStencil({ frameIndex }: { frameIndex: number }) {
-    const svgs = [
-        // Frame 1: Left Stroke (/)
-        <svg key={0} viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
-            <path d="M50 90 L25 50" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
-        </svg>,
-        // Frame 2: Right Stroke (\)
-        <svg key={1} viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
-            <path d="M50 90 L75 50" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
-        </svg>,
-        // Frame 3: Top Curves (^^)
-        <svg key={2} viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
-            <path d="M25 50 C 25 20, 50 35, 50 50 M50 50 C 50 35, 75 20, 75 50" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
-        </svg>,
-        // Frame 4: Completion Pose (Heart Outline)
-        <svg key={3} viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
-            <path d="M50 90 L25 50 C 25 20, 50 35, 50 50 C 50 35, 75 20, 75 50 Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
-        </svg>
-    ];
-    
-    const index = Math.min(frameIndex, 3);
-    return svgs[index] || null;
+function HeartFormationStencil({ frameIndex, layout, side }: { frameIndex: number, layout: "4-frame" | "9-frame", side: "left" | "right" }) {
+    if (layout === "4-frame") {
+        const leftSvgs = [
+            // Snap 1 (Top Row): Left user top-left curve, Right user top-right curve
+            <svg key="4-0-left" viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+                <path d="M25 80 C 25 20, 95 35, 95 80" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+            </svg>,
+            // Snap 2 (Bottom Row): Left user left stroke, Right user right stroke
+            <svg key="4-1-left" viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+                <path d="M95 20 L25 80" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+            </svg>
+        ];
+
+        const rightSvgs = [
+            <svg key="4-0-right" viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+                <path d="M75 80 C 75 20, 5 35, 5 80" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+            </svg>,
+            <svg key="4-1-right" viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+                <path d="M5 20 L75 80" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+            </svg>
+        ];
+        return side === "left" ? leftSvgs[Math.min(frameIndex, 1)] || null : rightSvgs[Math.min(frameIndex, 1)] || null;
+    } else {
+        // 9-frame layout
+        // Snap 1: Pos 1 (Left) & Pos 3 (Right)
+        // Snap 2: Pos 4 (Left) & Pos 5 (Right)
+        // Snap 3: Pos 6 (Left) & Pos 8 (Right)
+        // Snap 4: Pos 2 (Left) & Pos 7 (Right) -- Note: Pos 2 is top-center, Pos 7 is bottom-center
+        // Snap 5: Pos 9 (Center, both users just take selfie)
+        const leftSvgs = [
+            // Snap 1: Pos 1 (Top Left)
+            <svg key="9-0-left" viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+                <path d="M20 90 C 20 10, 100 10, 100 60" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+            </svg>,
+            // Snap 2: Pos 4 (Middle Left)
+            <svg key="9-1-left" viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+                <path d="M20 10 L100 90" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+            </svg>,
+            // Snap 3: Pos 6 (Bottom Left)
+            <svg key="9-2-left" viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+                <path d="M100 10 L100 90 M100 90 L20 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+            </svg>,
+            // Snap 4: Pos 2 (Top Center)
+            <svg key="9-3-left" viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+                <path d="M0 60 C 0 10, 50 30, 50 90 M50 90 C 50 30, 100 10, 100 60" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+            </svg>,
+            // Snap 5: Pos 9 (Center - Selfie, no stencil)
+            null
+        ];
+
+        const rightSvgs = [
+            // Snap 1: Pos 3 (Top Right)
+            <svg key="9-0-right" viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+                <path d="M80 90 C 80 10, 0 10, 0 60" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+            </svg>,
+            // Snap 2: Pos 5 (Middle Right)
+            <svg key="9-1-right" viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+                <path d="M80 10 L0 90" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+            </svg>,
+            // Snap 3: Pos 8 (Bottom Right)
+            <svg key="9-2-right" viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+                <path d="M0 10 L0 90 M0 90 L80 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+            </svg>,
+            // Snap 4: Pos 7 (Bottom Center)
+            <svg key="9-3-right" viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+                <path d="M0 10 L50 60 M50 60 L100 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+            </svg>,
+            // Snap 5: Pos 9 (Center - Selfie, no stencil)
+            null
+        ];
+
+        return side === "left" ? leftSvgs[Math.min(frameIndex, 4)] : rightSvgs[Math.min(frameIndex, 4)];
+    }
 }
 
 // ─── Capture Prompts ────────────────────────────────────────────
@@ -344,6 +395,7 @@ export default function BoothRoomPage() {
         phase,
         selectedFilter,
         selectedTemplate,
+        heartFormationLayout,
         countdownValue,
         captures,
         captureIndex,
@@ -364,6 +416,7 @@ export default function BoothRoomPage() {
         setPhase,
         setSelectedFilter,
         setSelectedTemplate,
+        setHeartFormationLayout,
         setLocalSide,
         setLocalZoom,
         setCountdownValue,
@@ -543,6 +596,7 @@ export default function BoothRoomPage() {
                         side: useBoothStore.getState().localSide, // Host's side
                         filterId: useBoothStore.getState().selectedFilter,
                         templateId: useBoothStore.getState().selectedTemplate,
+                        layout: useBoothStore.getState().heartFormationLayout,
                         zoom: useBoothStore.getState().localZoom,
                         facingMode: facingMode
                     });
@@ -601,6 +655,9 @@ export default function BoothRoomPage() {
                     setLocalSide(data.side === "left" ? "right" : "left");
                     setSelectedFilter(data.filterId);
                     setSelectedTemplate(data.templateId as any);
+                    if (data.layout) {
+                        setHeartFormationLayout(data.layout as "4-frame" | "9-frame");
+                    }
                     useBoothStore.getState().setRemoteZoom(data.zoom);
                     useBoothStore.getState().setRemoteFacingMode(data.facingMode);
                 } else if (data.type === "START_CAPTURE") {
@@ -624,6 +681,8 @@ export default function BoothRoomPage() {
                     setSelectedFilter(data.filterId);
                 } else if (data.type === "TEMPLATE_CHANGE") {
                     setSelectedTemplate(data.filterId as any);
+                } else if (data.type === "LAYOUT_CHANGE") {
+                    setHeartFormationLayout(data.layout as "4-frame" | "9-frame");
                 } else if (data.type === "SIDE_CHANGE") {
                     setLocalSide(data.side);
                 } else if (data.type === "ZOOM_CHANGE") {
@@ -773,8 +832,30 @@ export default function BoothRoomPage() {
 
     const handleTemplateSelect = (tid: any) => {
         setSelectedTemplate(tid);
+
+        let targetCaptures = useBoothStore.getState().maxCaptures;
+        if (tid === "heart-formation") {
+            const currentLayout = useBoothStore.getState().heartFormationLayout;
+            targetCaptures = currentLayout === "4-frame" ? 2 : 5;
+            useBoothStore.getState().setMaxCaptures(targetCaptures);
+        }
+
         if (partnerConnected) {
             sendSyncEvent({ type: "TEMPLATE_CHANGE", filterId: tid });
+            if (tid === "heart-formation") {
+                sendSyncEvent({ type: "CAPTURE_COUNT_CHANGE", count: targetCaptures });
+            }
+        }
+    };
+
+    const handleHeartFormationLayoutSelect = (layout: "4-frame" | "9-frame") => {
+        setHeartFormationLayout(layout);
+        const targetCaptures = layout === "4-frame" ? 2 : 5;
+        useBoothStore.getState().setMaxCaptures(targetCaptures);
+
+        if (partnerConnected) {
+            sendSyncEvent({ type: "LAYOUT_CHANGE", layout });
+            sendSyncEvent({ type: "CAPTURE_COUNT_CHANGE", count: targetCaptures });
         }
     };
 
@@ -1243,7 +1324,16 @@ export default function BoothRoomPage() {
 
                                     {/* Heart Formation Stencil Overlay */}
                                     {selectedTemplate === "heart-formation" && (phase === "preview" || phase === "countdown" || phase === "capturing") && (
-                                        <HeartFormationStencil frameIndex={captureIndex} />
+                                        <>
+                                        <div className="absolute inset-0 pointer-events-none z-30 flex" style={{ width: '200%', left: localSide === "left" ? "0%" : "-100%" }}>
+                                            <div className="w-1/2 relative h-full">
+                                                <HeartFormationStencil frameIndex={captureIndex} layout={heartFormationLayout} side="left" />
+                                            </div>
+                                            <div className="w-1/2 relative h-full">
+                                                <HeartFormationStencil frameIndex={captureIndex} layout={heartFormationLayout} side="right" />
+                                            </div>
+                                        </div>
+                                        </>
                                     )}
                                 </div>
 
@@ -1257,46 +1347,48 @@ export default function BoothRoomPage() {
                                             />
                                         </div>
 
-                                        {/* Capture Count Selector */}
-                                        <div className="relative">
-                                            <button
-                                                onClick={() => setShowCountMenu(!showCountMenu)}
-                                                className="glass px-3 py-1.5 rounded-xl border border-white/5 flex items-center gap-2 hover:bg-white/5 transition-colors"
-                                            >
-                                                <span className="text-xs text-gray-400 whitespace-nowrap">Photos:</span>
-                                                <span className="text-sm text-pink-light font-bold flex items-center gap-1">
-                                                    {useBoothStore.getState().maxCaptures}
-                                                    <span className="text-[10px]">▼</span>
-                                                </span>
-                                            </button>
-                                            
-                                            <AnimatePresence>
-                                                {showCountMenu && (
-                                                    <motion.div
-                                                        initial={{ opacity: 0, y: -10 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        exit={{ opacity: 0, y: -10 }}
-                                                        className="absolute top-full right-0 mt-2 w-32 bg-charcoal border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 grid grid-cols-2 gap-1 p-2"
-                                                    >
-                                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
-                                                            <button
-                                                                key={num}
-                                                                onClick={() => {
-                                                                    useBoothStore.getState().setMaxCaptures(num);
-                                                                    if (partnerConnected) {
-                                                                        sendSyncEvent({ type: "CAPTURE_COUNT_CHANGE", count: num });
-                                                                    }
-                                                                    setShowCountMenu(false);
-                                                                }}
-                                                                className={`py-1.5 rounded-lg text-sm font-medium transition-colors ${useBoothStore.getState().maxCaptures === num ? "bg-pink-primary text-white" : "text-gray-300 hover:bg-white/10"}`}
-                                                            >
-                                                                {num}
-                                                            </button>
-                                                        ))}
-                                                    </motion.div>
-                                                )}
-                                            </AnimatePresence>
-                                        </div>
+                                        {/* Capture Count Selector (hide when Love Theme is selected, as counts are fixed) */}
+                                        {selectedTemplate !== "heart-formation" && (
+                                            <div className="relative">
+                                                <button
+                                                    onClick={() => setShowCountMenu(!showCountMenu)}
+                                                    className="glass px-3 py-1.5 rounded-xl border border-white/5 flex items-center gap-2 hover:bg-white/5 transition-colors"
+                                                >
+                                                    <span className="text-xs text-gray-400 whitespace-nowrap">Photos:</span>
+                                                    <span className="text-sm text-pink-light font-bold flex items-center gap-1">
+                                                        {useBoothStore.getState().maxCaptures}
+                                                        <span className="text-[10px]">▼</span>
+                                                    </span>
+                                                </button>
+
+                                                <AnimatePresence>
+                                                    {showCountMenu && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, y: -10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: -10 }}
+                                                            className="absolute top-full right-0 mt-2 w-32 bg-charcoal border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 grid grid-cols-2 gap-1 p-2"
+                                                        >
+                                                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                                                                <button
+                                                                    key={num}
+                                                                    onClick={() => {
+                                                                        useBoothStore.getState().setMaxCaptures(num);
+                                                                        if (partnerConnected) {
+                                                                            sendSyncEvent({ type: "CAPTURE_COUNT_CHANGE", count: num });
+                                                                        }
+                                                                        setShowCountMenu(false);
+                                                                    }}
+                                                                    className={`py-1.5 rounded-lg text-sm font-medium transition-colors ${useBoothStore.getState().maxCaptures === num ? "bg-pink-primary text-white" : "text-gray-300 hover:bg-white/10"}`}
+                                                                >
+                                                                    {num}
+                                                                </button>
+                                                            ))}
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Template Carousel in Preview Phase */}
@@ -1306,6 +1398,31 @@ export default function BoothRoomPage() {
                                             selected={selectedTemplate}
                                             onSelect={handleTemplateSelect}
                                         />
+
+                                        {selectedTemplate === "heart-formation" && (
+                                            <div className="mt-4 flex gap-2 w-full max-w-sm mx-auto">
+                                                <button
+                                                    onClick={() => handleHeartFormationLayoutSelect("4-frame")}
+                                                    className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                                                        heartFormationLayout === "4-frame"
+                                                            ? "bg-pink-primary text-white shadow-lg shadow-pink-primary/30"
+                                                            : "bg-white/5 text-gray-400 hover:bg-white/10"
+                                                    }`}
+                                                >
+                                                    4 Images (2 Snaps)
+                                                </button>
+                                                <button
+                                                    onClick={() => handleHeartFormationLayoutSelect("9-frame")}
+                                                    className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                                                        heartFormationLayout === "9-frame"
+                                                            ? "bg-pink-primary text-white shadow-lg shadow-pink-primary/30"
+                                                            : "bg-white/5 text-gray-400 hover:bg-white/10"
+                                                    }`}
+                                                >
+                                                    9 Images (5 Snaps)
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 

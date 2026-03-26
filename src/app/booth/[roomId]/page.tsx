@@ -302,6 +302,31 @@ function TemplateCarousel({
     );
 }
 
+// ─── Heart Formation Stencil ────────────────────────────────────
+function HeartFormationStencil({ frameIndex }: { frameIndex: number }) {
+    const svgs = [
+        // Frame 1: Left Stroke (/)
+        <svg key={0} viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+            <path d="M50 90 L25 50" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+        </svg>,
+        // Frame 2: Right Stroke (\)
+        <svg key={1} viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+            <path d="M50 90 L75 50" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+        </svg>,
+        // Frame 3: Top Curves (^^)
+        <svg key={2} viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+            <path d="M25 50 C 25 20, 50 35, 50 50 M50 50 C 50 35, 75 20, 75 50" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+        </svg>,
+        // Frame 4: Completion Pose (Heart Outline)
+        <svg key={3} viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary opacity-50 absolute inset-0 pointer-events-none z-30 drop-shadow-xl" style={{ filter: 'drop-shadow(0 0 10px rgba(255,105,180,0.8))' }}>
+            <path d="M50 90 L25 50 C 25 20, 50 35, 50 50 C 50 35, 75 20, 75 50 Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" strokeDasharray="4 4" />
+        </svg>
+    ];
+    
+    const index = Math.min(frameIndex, 3);
+    return svgs[index] || null;
+}
+
 // ─── Capture Prompts ────────────────────────────────────────────
 const CAPTURE_PROMPTS = [
     "Smile at each other! 😊",
@@ -1215,12 +1240,17 @@ export default function BoothRoomPage() {
                                             <ArrowLeftRight size={18} />
                                         </button>
                                     )}
+
+                                    {/* Heart Formation Stencil Overlay */}
+                                    {selectedTemplate === "heart-formation" && (phase === "preview" || phase === "countdown" || phase === "capturing") && (
+                                        <HeartFormationStencil frameIndex={captureIndex} />
+                                    )}
                                 </div>
 
-                                {/* Filter carousel */}
-                                <div className="mt-5 w-full">
+                                {/* Carousels */}
+                                <div className="mt-5 w-full flex flex-col gap-4">
                                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
-                                        <div className="w-full sm:w-auto">
+                                        <div className="w-full sm:w-auto overflow-hidden">
                                             <FilterCarousel
                                                 selected={selectedFilter}
                                                 onSelect={handleFilterSelect}
@@ -1268,6 +1298,15 @@ export default function BoothRoomPage() {
                                             </AnimatePresence>
                                         </div>
                                     </div>
+
+                                    {/* Template Carousel in Preview Phase */}
+                                    <div className="w-full overflow-hidden">
+                                        <label className="text-xs text-gray-400 mb-2 block px-1">Theme / Template</label>
+                                        <TemplateCarousel
+                                            selected={selectedTemplate}
+                                            onSelect={handleTemplateSelect}
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Capture button */}
@@ -1314,13 +1353,25 @@ export default function BoothRoomPage() {
                                                 stiffness: 80,
                                                 damping: 10,
                                             }}
-                                            className="glass-card p-3 rounded-2xl"
+                                            className="glass-card p-3 rounded-2xl relative overflow-hidden"
                                         >
                                             <img
                                                 src={stripUrl}
                                                 alt="Your LoveLens photostrip"
                                                 className="w-full rounded-xl"
                                             />
+                                            {selectedTemplate === "heart-formation" && (
+                                                <motion.div 
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: [0, 0.4, 0] }}
+                                                    transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+                                                    className="absolute inset-0 pointer-events-none flex items-center justify-center z-10"
+                                                >
+                                                    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full text-pink-primary drop-shadow-[0_0_15px_rgba(255,105,180,1)] opacity-70">
+                                                        <path d="M50 85 L25 45 C 25 15, 50 30, 50 45 C 50 30, 75 15, 75 45 Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                                                    </svg>
+                                                </motion.div>
+                                            )}
                                         </motion.div>
                                     ) : (
                                         <div className="glass-card p-3 rounded-2xl">

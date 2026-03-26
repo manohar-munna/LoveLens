@@ -13,7 +13,7 @@ interface ComposeOptions {
     textSize?: number;
     fontFamily?: FontId;
     borderStyle: "white" | "pink" | "black" | "polaroid";
-    selectedTemplate: "none" | "hearts" | "stars" | "crown";
+    selectedTemplate: "none" | "hearts" | "stars" | "crown" | "heart-formation";
     localSide: "left" | "right";
 }
 
@@ -45,7 +45,7 @@ export async function composePhotostrip(
     const STRIP_WIDTH = 1200;
     const FRAME_HEIGHT = 440; // 4:3 ratio for each person (560x440)
     const BORDER = 40;
-    const GAP = 16;
+    const GAP = selectedTemplate === "heart-formation" ? 0 : 16;
     const FOOTER_HEIGHT = 80;
 
     const totalHeight =
@@ -87,9 +87,16 @@ export async function composePhotostrip(
 
             const halfWidth = innerWidth / 2;
 
-            // Draw ONE combined rounded frame background to clip both images
+            // Draw ONE combined frame background to clip both images
             ctx.save();
-            roundedRect(ctx, BORDER, yOffset, innerWidth, FRAME_HEIGHT, 16);
+            if (selectedTemplate === "heart-formation") {
+                // Seamless: Draw full rectangle without border radius
+                ctx.beginPath();
+                ctx.rect(BORDER, yOffset, innerWidth, FRAME_HEIGHT);
+                ctx.closePath();
+            } else {
+                roundedRect(ctx, BORDER, yOffset, innerWidth, FRAME_HEIGHT, 16);
+            }
             ctx.clip();
 
             const leftImg = localSide === "left" ? localImg : remoteImg;

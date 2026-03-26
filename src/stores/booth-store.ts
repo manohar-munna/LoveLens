@@ -79,7 +79,7 @@ export type BoothPhase =
     | "customizing"
     | "exporting";
 
-export type TemplateId = "none" | "hearts" | "stars" | "crown";
+export type TemplateId = "none" | "hearts" | "stars" | "crown" | "heart-formation";
 
 export type FontId = "outfit" | "dancing" | "pacifico" | "caveat" | "vt323";
 
@@ -108,6 +108,7 @@ export const TEMPLATES: TemplateDef[] = [
     { id: "hearts", name: "Hearts Crown", emoji: "💖" },
     { id: "stars", name: "Star Magic", emoji: "✨" },
     { id: "crown", name: "Royal Crown", emoji: "👑" },
+    { id: "heart-formation", name: "Love Theme", emoji: "🫶" },
 ];
 
 export interface CapturedFrame {

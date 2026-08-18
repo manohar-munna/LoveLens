@@ -1,94 +1,219 @@
-# LoveLens — Capturing Love Beyond Distance 💕
+# LoveLens 💕 — Capturing Love Beyond Distance
 
-A virtual photobooth for long-distance couples. Take synchronized photos together in real-time, apply filters, and create beautiful photostrips.
+<p align="center">
+  <img src="public/favicon.ico" alt="LoveLens Logo" width="80" height="80" />
+</p>
 
-## Features
+<p align="center">
+  <strong>A real-time, synchronized virtual photobooth built for long-distance couples.</strong><br>
+  Take simultaneous photos together, apply nostalgic vintage filters, customize photostrips, and download printable keepsakes.
+</p>
 
-- 🎥 **Real-time video** — WebRTC peer-to-peer connection
-- 📸 **8 filters** — Vintage, Polaroid, B&W, Romantic, VHS, Dreamy, and more
-- 🖼️ **Photostrip** — Generates printable photo strips with customization
-- 🎨 **3 themes** — Dark, Pink (with animated hearts), and Light (premium pale)
-- 📱 **Mobile responsive** — Works on phones and tablets
-- 🔗 **Room system** — Room codes for partner pairing, max 2 per room
+<p align="center">
+  <a href="https://github.com/manohar-munna/LoveLens/stargazers"><img src="https://img.shields.io/github/stars/manohar-munna/LoveLens?color=ff69b4&style=flat-square" alt="Stars"></a>
+  <a href="https://github.com/manohar-munna/LoveLens/network/members"><img src="https://img.shields.io/github/forks/manohar-munna/LoveLens?color=ff69b4&style=flat-square" alt="Forks"></a>
+  <a href="https://github.com/manohar-munna/LoveLens/issues"><img src="https://img.shields.io/github/issues/manohar-munna/LoveLens?color=ff69b4&style=flat-square" alt="Issues"></a>
+  <a href="https://github.com/manohar-munna/LoveLens/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License"></a>
+  <img src="https://img.shields.io/badge/Next.js-16.1.6-black?style=flat-square&logo=next.js" alt="Next.js">
+  <img src="https://img.shields.io/badge/React-19.2.3-61dafb?style=flat-square&logo=react" alt="React">
+  <img src="https://img.shields.io/badge/WebRTC-Peer--to--Peer-333333?style=flat-square&logo=webrtc" alt="WebRTC">
+  <img src="https://img.shields.io/badge/Socket.IO-4.8.3-010101?style=flat-square&logo=socket.io" alt="Socket.IO">
+  <img src="https://img.shields.io/badge/Tailwind_CSS-v4-38bdf8?style=flat-square&logo=tailwindcss" alt="Tailwind CSS">
+</p>
 
-## Architecture
+---
+
+## ✨ Features
+
+### 🎥 Real-Time Peer-to-Peer Video
+- **Encrypted WebRTC connection** with Google STUN servers for seamless, low-latency live streaming between partners.
+- **Side-by-side viewfinder** with customizable camera layouts and instant swap options.
+- **Camera flip & zoom controls** (1x, 1.25x, 1.5x, 2x) for mobile and desktop devices.
+
+### 📸 Synchronized Photobooth Capture
+- **Simultaneous Capture:** Host-initiated trigger starts a synchronized 3-second animated countdown on both screens.
+- **Visual Flash Effect:** Immersive screen flash when the frame is captured.
+- **Lossless Quality:** High-resolution local camera snapshots captured on each peer and exchanged via WebSocket data channels.
+- **Configurable Shot Count:** Choose between 1 to 6 captures per session.
+
+### 🎨 Retro & Modern Photo Filters
+Real-time CSS and Canvas filter rendering:
+- ✨ **No Filter** — Crystal-clear natural camera feed
+- 🎞️ **Vintage Film** — Warm sepia tones with nostalgic contrast
+- 📸 **Polaroid** — Vibrant saturation with boosted exposure
+- 🖤 **B&W Film** — High-contrast classic monochrome
+- 💕 **Romantic** — Soft pink hues with glowing brightness
+- 📼 **VHS** — Desaturated retro videotape texture
+- 🌸 **Dreamy** — Pastel hues with soft dreamy warmth
+- 📷 **Disposable** — Authentic 90s disposable camera aesthetic
+- 🤳 **Old Digital** — Early 2000s digicam vibes
+
+### 🫶 Stickers & Heart Formation Templates
+- **Interactive Stickers:** Hearts Crown (💖), Star Magic (✨), Royal Crown (👑).
+- **Heart Formation Mode (🫶):** Seamless combined split-frame template allowing couples to pose together across screens (e.g. creating a continuous hand-heart).
+
+### 🖼️ Photostrip Customization
+- **Border Themes:** Classic White, Pastel Pink, Obsidian Black, and Textured Polaroid.
+- **Typography & Captioning:** Custom captions with 5 Google Fonts (*Outfit, Dancing Script, Pacifico, Caveat, VT323 Retro*) and dynamic text scaling.
+- **Date Stamp:** Toggleable timestamp stamp for memory preservation.
+- **Session Controls:** Rearrange frames, retake shots, delete captures with undo support.
+
+### 💾 Multi-Format Export & Sharing
+- **High-Res Downloads:** Export photostrips in **PNG** and **JPG**.
+- **Printable PDF:** Generate printable photo strips formatted with `jspdf`.
+- **Native Mobile Sharing:** One-click integration with the Web Share API.
+
+### 🌙 Dynamic Theming
+- **Dark Mode:** Deep obsidian background with electric pink accents.
+- **Pink Mode:** Romantic pastel aesthetic with floating animated hearts.
+- **Light Mode:** Clean, minimal, high-contrast aesthetic.
+
+---
+
+## 🏗️ Architecture
 
 ```
-┌─────────────────┐     ┌──────────────────────┐
-│ Next.js Frontend│────▶│ Signaling Server     │
-│ (Vercel)        │◀────│ (Render.com)         │
-│ Port 3000       │     │ Port 3001            │
-└─────────────────┘     │ • Socket.IO          │
-                        │ • Room HTTP API      │
-                        └──────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                      Next.js 16 Client                      │
+│        (React 19 • Tailwind CSS 4 • Framer Motion)          │
+│                                                             │
+│   ┌──────────────────┐               ┌──────────────────┐   │
+│   │ Local Media      │               │ Canvas Strip     │   │
+│   │ Stream & Zoom    │               │ Compositor       │   │
+│   └─────────┬────────┘               └────────▲─────────┘   │
+└─────────────┼─────────────────────────────────┼─────────────┘
+              │                                 │
+              │ WebRTC P2P Video Stream         │ High-Res Blobs
+              │ (Zero Server Storage)           │ & State Sync
+              ▼                                 │
+┌──────────────────────────┐           ┌────────┴─────────────┐
+│       Remote Peer        │           │   Signaling Server   │
+│     (Partner Client)     │◀─────────▶│ (Node.js + Socket.IO)│
+└──────────────────────────┘  WebRTC   │ Port: 3001           │
+                               SDP/ICE └──────────────────────┘
 ```
 
-## Local Development
+---
 
+## 🚀 Quick Start
+
+### Prerequisites
+- **Node.js** `v20.0.0` or higher
+- **npm**, **pnpm**, or **yarn**
+- Modern web browser with camera and microphone permissions
+
+### 1. Clone Repository
 ```bash
-# Install dependencies
-npm install
-cd server && npm install && cd ..
+git clone https://github.com/manohar-munna/LoveLens.git
+cd LoveLens
+```
 
-# Run both Next.js + signaling server
+### 2. Install Dependencies
+```bash
+# Install frontend dependencies
+npm install
+
+# Install signaling server dependencies
+cd server && npm install && cd ..
+```
+
+### 3. Start Development Environment
+```bash
 npm run dev
 ```
 
-This starts:
-- **Next.js** on `http://localhost:3000`
-- **Signaling server** on `http://localhost:3001`
+This concurrently boots:
+- 🌐 **Frontend:** [http://localhost:3000](http://localhost:3000)
+- 🔌 **Signaling Server:** [http://localhost:3001](http://localhost:3001)
 
-## Deployment
+---
 
-### 1. Frontend → Vercel
+## ⚙️ Environment Variables
 
-1. Push your code to GitHub
-2. Go to [vercel.com](https://vercel.com) → Import your repo
+Create a `.env.local` file in the root directory:
+
+```env
+# URL of your Socket.IO signaling server
+# For local development:
+NEXT_PUBLIC_SIGNALING_URL=http://localhost:3001
+
+# For production (e.g. Render/Railway):
+# NEXT_PUBLIC_SIGNALING_URL=https://your-signaling-server.onrender.com
+```
+
+---
+
+## 📦 Deployment Guide
+
+### Option A: Frontend on Vercel
+1. Push your repository to GitHub.
+2. Import the project into [Vercel](https://vercel.com).
 3. In **Settings → Environment Variables**, add:
+   ```env
+   NEXT_PUBLIC_SIGNALING_URL=https://your-signaling-server.onrender.com
    ```
-   NEXT_PUBLIC_SIGNALING_URL = https://your-signaling-server.onrender.com
-   ```
-4. Deploy — Vercel handles the rest
+4. Click **Deploy**.
 
-### 2. Signaling Server → Render.com
+---
 
-Follow these steps to deploy the signaling server for free on Render:
+### Option B: Signaling Server on Render (Free Tier)
+1. Log in to [Render](https://render.com) and click **New + → Web Service**.
+2. Connect your GitHub repository.
+3. Configure the service settings:
+   - **Name:** `lovelens-signaling`
+   - **Root Directory:** `server`
+   - **Runtime:** `Node`
+   - **Build Command:** `npm install`
+   - **Start Command:** `npx tsx index.ts`
+   - **Instance Type:** `Free`
+4. Deploy the service and copy the generated URL (`https://lovelens-signaling.onrender.com`).
+5. Update `NEXT_PUBLIC_SIGNALING_URL` in your Vercel project settings and redeploy the frontend.
 
-#### Step 1: Create a Render Account
-- Go to [render.com](https://render.com) and sign up (free)
+> [!NOTE]
+> Render's free tier spins down instances after 15 minutes of inactivity. First connections might take ~30 seconds to establish if the instance is sleeping.
 
-#### Step 2: Create a New Web Service
-1. Click **"New +"** → **"Web Service"**
-2. Connect your GitHub repo
-3. Configure the service:
+---
 
-   | Setting | Value |
-   |---------|-------|
-   | **Name** | `lovelens-signaling` |
-   | **Root Directory** | `server` |
-   | **Runtime** | `Node` |
-   | **Build Command** | `npm install` |
-   | **Start Command** | `npx tsx index.ts` |
-   | **Instance Type** | `Free` |
+## 🔒 Privacy & Security
 
-4. Click **"Create Web Service"**
+- 🛡️ **Zero Server Image Storage:** All photo capture, filter processing, and photostrip rendering occur strictly client-side via the HTML5 Canvas API. No photos are ever uploaded or stored on any server.
+- 🔐 **End-to-End P2P Video:** Live video feeds are streamed peer-to-peer using WebRTC encryption.
+- ⚡ **Ephemeral Rooms:** Rooms and socket sessions are destroyed in memory immediately once participants leave.
 
-#### Step 3: Get Your Server URL
-- Once deployed, Render gives you a URL like:
-  `https://lovelens-signaling.onrender.com`
-- Copy this URL
+---
 
-#### Step 4: Update Vercel Environment Variable
-- Go to your Vercel project → **Settings → Environment Variables**
-- Set `NEXT_PUBLIC_SIGNALING_URL` to your Render URL
-- **Redeploy** your Vercel app
+## 🛠️ Tech Stack
 
-#### ⚠️ Free Tier Note
-Render's free tier spins down after 15 minutes of inactivity. The first connection may take ~30 seconds to wake up. For always-on, upgrade to the paid tier ($7/mo).
+| Layer | Technology |
+|---|---|
+| **Framework** | [Next.js 16 (App Router)](https://nextjs.org/) |
+| **UI Library** | [React 19](https://react.dev/) |
+| **Styling** | [Tailwind CSS 4](https://tailwindcss.com/) |
+| **Animations** | [Framer Motion](https://www.framer.com/motion/) |
+| **Icons** | [Lucide React](https://lucide.dev/) |
+| **State Management** | [Zustand](https://zustand-demo.pmnd.rs/) |
+| **PDF Generation** | [jsPDF](https://github.com/parallax/jsPDF) |
+| **Real-time Signaling** | [Socket.IO](https://socket.io/) (Node.js + TypeScript) |
+| **Media & Streaming** | WebRTC (`RTCPeerConnection`, `MediaDevices API`, STUN) |
 
-## Tech Stack
+---
 
-- **Frontend:** Next.js 16, React 19, Framer Motion, Zustand, Tailwind CSS 4
-- **Signaling:** Socket.IO, Node.js
-- **Video:** WebRTC (peer-to-peer)
-- **Fonts:** Outfit, Inter (Google Fonts)
+## 🤝 Contributing
+
+Contributions are warmly welcomed! To contribute:
+
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feature/amazing-feature`).
+3. Commit your changes (`git commit -m 'feat: add amazing new feature'`).
+4. Push to the branch (`git push origin feature/amazing-feature`).
+5. Open a Pull Request.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+<p align="center">
+  Made with 💖 for couples across every distance.
+</p>

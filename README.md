@@ -25,16 +25,20 @@
 
 ## ✨ Features
 
-### 🎥 Real-Time Peer-to-Peer Video
-- **Encrypted WebRTC connection** with Google STUN servers for seamless, low-latency live streaming between partners.
-- **Side-by-side viewfinder** with customizable camera layouts and instant swap options.
-- **Camera flip & zoom controls** (1x, 1.25x, 1.5x, 2x) for mobile and desktop devices.
+### 🎥 Real-Time Peer-to-Peer Video & Robust Connectivity
+- **Encrypted WebRTC Streaming:** Direct P2P video stream using Google STUN servers for ultra-low latency.
+- **🔄 One-Click Stream Refresh & Reconnect:** Instantly re-negotiate WebRTC with ICE restart and verify media streams without leaving or reloading the booth.
+- **📱 Front & Back Camera Flip for Mobiles:** Switch seamlessly between front (selfie) and back (environment) cameras on phones and tablets with dynamic mirroring adjustments.
+- **⚠️ Cross-Peer Issue & Permission Alerts:** Real-time device status indicators that notify your partner if camera permissions are blocked, in use, or loading.
+- **🛡️ 5-Minute Empty Booth Grace Period:** Rooms persist for 5 minutes after both users leave, preventing accidental room deletion and allowing seamless rejoining without false "Room is full" errors.
+- **📲 Mobile Tab Auto-Recovery:** Listens to page visibility changes to revive frozen video tracks when returning from background tabs or locked screens.
+- **Side-by-Side Viewfinder:** Intuitive twin-feed layout with position swapping and pinch/slider zoom (1x to 3x).
 
 ### 📸 Synchronized Photobooth Capture
 - **Simultaneous Capture:** Host-initiated trigger starts a synchronized 3-second animated countdown on both screens.
 - **Visual Flash Effect:** Immersive screen flash when the frame is captured.
 - **Lossless Quality:** High-resolution local camera snapshots captured on each peer and exchanged via WebSocket data channels.
-- **Configurable Shot Count:** Choose between 1 to 6 captures per session.
+- **Configurable Shot Count:** Choose between 1 to 10 captures per session.
 
 ### 🎨 Retro & Modern Photo Filters
 Real-time CSS and Canvas filter rendering:
@@ -90,7 +94,7 @@ Real-time CSS and Canvas filter rendering:
 │       Remote Peer        │           │   Signaling Server   │
 │     (Partner Client)     │◀─────────▶│ (Node.js + Socket.IO)│
 └──────────────────────────┘  WebRTC   │ Port: 3001           │
-                               SDP/ICE └──────────────────────┘
+                              SDP/ICE └──────────────────────┘
 ```
 
 ---
@@ -100,7 +104,7 @@ Real-time CSS and Canvas filter rendering:
 ### Prerequisites
 - **Node.js** `v20.0.0` or higher
 - **npm**, **pnpm**, or **yarn**
-- Modern web browser with camera and microphone permissions
+- Modern web browser with camera permissions
 
 ### 1. Clone Repository
 ```bash
@@ -178,7 +182,7 @@ NEXT_PUBLIC_SIGNALING_URL=http://localhost:3001
 
 - 🛡️ **Zero Server Image Storage:** All photo capture, filter processing, and photostrip rendering occur strictly client-side via the HTML5 Canvas API. No photos are ever uploaded or stored on any server.
 - 🔐 **End-to-End P2P Video:** Live video feeds are streamed peer-to-peer using WebRTC encryption.
-- ⚡ **Ephemeral Rooms:** Rooms and socket sessions are destroyed in memory immediately once participants leave.
+- ⏱️ **5-Minute Empty Booth Grace Period:** Rooms are preserved in memory for 5 minutes after both users leave to permit reloads and network recoveries, after which they are cleanly pruned.
 
 ---
 

@@ -120,6 +120,11 @@ export interface CapturedFrame {
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'waiting' | 'connected';
 
+export interface PartnerDeviceStatus {
+    cameraStatus: "ready" | "permission_denied" | "not_found" | "in_use" | "error" | "loading" | "reconnecting";
+    message?: string;
+}
+
 interface BoothStore {
     // Room
     roomId: string | null;
@@ -130,6 +135,10 @@ interface BoothStore {
     // Camera
     localStream: MediaStream | null;
     remoteStream: MediaStream | null;
+
+    // Device / Partner status
+    partnerDeviceStatus: PartnerDeviceStatus | null;
+    isReconnecting: boolean;
 
     // Booth state
     phase: BoothPhase;
@@ -161,6 +170,8 @@ interface BoothStore {
     setConnectionStatus: (status: ConnectionStatus) => void;
     setLocalStream: (stream: MediaStream | null) => void;
     setRemoteStream: (stream: MediaStream | null) => void;
+    setPartnerDeviceStatus: (status: PartnerDeviceStatus | null) => void;
+    setIsReconnecting: (isReconnecting: boolean) => void;
     setPhase: (phase: BoothPhase) => void;
     setSelectedFilter: (filter: FilterId) => void;
     setCountdownValue: (value: number) => void;
@@ -189,6 +200,8 @@ export const useBoothStore = create<BoothStore>((set) => ({
     connectionStatus: 'disconnected',
     localStream: null,
     remoteStream: null,
+    partnerDeviceStatus: null,
+    isReconnecting: false,
     phase: "waiting",
     selectedFilter: "none",
     countdownValue: 3,
@@ -213,6 +226,8 @@ export const useBoothStore = create<BoothStore>((set) => ({
     setConnectionStatus: (status) => set({ connectionStatus: status }),
     setLocalStream: (stream) => set({ localStream: stream }),
     setRemoteStream: (stream) => set({ remoteStream: stream }),
+    setPartnerDeviceStatus: (status) => set({ partnerDeviceStatus: status }),
+    setIsReconnecting: (isReconnecting) => set({ isReconnecting }),
     setPhase: (phase) => set({ phase }),
     setSelectedFilter: (filter) => set({ selectedFilter: filter }),
     setCountdownValue: (value) => set({ countdownValue: value }),
@@ -244,5 +259,6 @@ export const useBoothStore = create<BoothStore>((set) => ({
             captureIndex: 0,
             caption: "",
             retakeRequest: false,
+            isReconnecting: false,
         }),
 }));

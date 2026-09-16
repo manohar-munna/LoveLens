@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Heart, Camera, Copy, Check, Share2, Loader2, ArrowLeft, ArrowRight, Link2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { generateRoomId, getRoomUrl, copyToClipboard } from "@/lib/room";
-import { SIGNALING_URL } from "@/lib/signaling";
+import { getSignalingUrl } from "@/lib/signaling";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import Link from "next/link";
 
@@ -21,7 +21,7 @@ export default function BoothEntryPage() {
         setIsCreating(true);
         const id = generateRoomId();
         try {
-            const res = await fetch(`${SIGNALING_URL}/api/rooms`, {
+            const res = await fetch(`${getSignalingUrl()}/api/rooms`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ roomId: id }),
@@ -78,7 +78,7 @@ export default function BoothEntryPage() {
         setJoinError("");
 
         try {
-            const res = await fetch(`${SIGNALING_URL}/api/rooms/${code}`);
+            const res = await fetch(`${getSignalingUrl()}/api/rooms/${code}`);
             const data = await res.json();
 
             if (!data.exists) {

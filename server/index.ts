@@ -228,11 +228,14 @@ io.on("connection", (socket: Socket) => {
         // If partner is already present, sync status and trigger WebRTC handshake
         if (memberCount === 2) {
             io.to(roomId).emit("partner-joined");
+            io.to(roomId).emit("reset-peer-connection");
 
             // Find host
             const host = activeParticipants.find((p) => p.isHost) || activeParticipants[0];
-            io.to(host.socketId).emit("create-offer", { iceRestart: false });
-            console.log(`[ws] Room ${roomId} matched — host ${host.socketId} creating offer`);
+            setTimeout(() => {
+                io.to(host.socketId).emit("create-offer", { iceRestart: false });
+                console.log(`[ws] Room ${roomId} matched — host ${host.socketId} creating offer`);
+            }, 60);
 
             // If partner has known device status, send it to the newly joined peer
             const partner = activeParticipants.find((p) => p.clientId !== clientId);
@@ -266,11 +269,15 @@ io.on("connection", (socket: Socket) => {
 
         console.log(`[ws] Reconnect requested by ${socket.id} in ${info.roomId}`);
         socket.to(info.roomId).emit("partner-reconnecting");
+        io.to(info.roomId).emit("reset-peer-connection");
 
         const activeParticipants = Array.from(room.participants.values()).filter((p) => p.connected);
         const host = activeParticipants.find((p) => p.isHost) || activeParticipants[0];
         if (host) {
-            io.to(host.socketId).emit("create-offer", { iceRestart: true });
+            setTimeout(() => {
+                io.to(host.socketId).emit("create-offer", { iceRestart: false });
+                console.log(`[ws] Dispatched create-offer to host ${host.socketId} after peer connection reset`);
+            }, 60);
         }
     });
 

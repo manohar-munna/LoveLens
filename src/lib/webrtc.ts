@@ -12,6 +12,9 @@ const ICE_SERVERS: RTCIceServer[] = [
 ];
 
 let peerConnection: RTCPeerConnection | null = null;
+let savedLocalStream: MediaStream | null = null;
+let savedCallbacks: WebRTCCallbacks | null = null;
+let iceCandidateQueue: RTCIceCandidateInit[] = [];
 
 export interface WebRTCCallbacks {
     onRemoteStream: (stream: MediaStream) => void;
@@ -20,21 +23,27 @@ export interface WebRTCCallbacks {
 }
 
 export function createPeerConnection(
-    localStream: MediaStream,
+    localStream: MediaStream | null,
     callbacks: WebRTCCallbacks
 ): RTCPeerConnection {
-    // Close existing connection if any
+    // Close existing connection cleanly
     closePeerConnection();
+
+    savedLocalStream = localStream;
+    savedCallbacks = callbacks;
+    iceCandidateQueue = [];
 
     peerConnection = new RTCPeerConnection({
         iceServers: ICE_SERVERS,
         iceCandidatePoolSize: 2,
     });
 
-    // Add local tracks to the connection
-    localStream.getTracks().forEach((track) => {
-        peerConnection!.addTrack(track, localStream);
-    });
+    // Add local tracks to the connection if stream is available
+    if (localStream) {
+        localStream.getTracks().forEach((track) => {
+            peerConnection!.addTrack(track, localStream);
+        });
+    }
 
     // Handle incoming remote tracks
     peerConnection.ontrack = (event) => {
@@ -44,7 +53,7 @@ export function createPeerConnection(
         }
     };
 
-    // Handle ICE candidates
+    // Handle ICE candidates generated locally
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
             callbacks.onIceCandidate(event.candidate);
@@ -62,7 +71,7 @@ export function createPeerConnection(
 
     peerConnection.oniceconnectionstatechange = () => {
         const iceState = peerConnection?.iceConnectionState;
-        console.log("[webrtc] ICE state:", iceState);
+        console.log("[webrtc] ICE connection state:", iceState);
         if (iceState === "failed" || iceState === "disconnected") {
             console.warn("[webrtc] ICE connection degraded/failed:", iceState);
         }
@@ -71,28 +80,58 @@ export function createPeerConnection(
     return peerConnection;
 }
 
-export async function createOffer(options?: { iceRestart?: boolean }): Promise<RTCSessionDescriptionInit> {
-    if (!peerConnection) throw new Error("No peer connection");
+async function drainIceCandidates(): Promise<void> {
+    if (!peerConnection || !peerConnection.remoteDescription) return;
+    if (iceCandidateQueue.length === 0) return;
 
-    const offer = await peerConnection.createOffer({
+    console.log(`[webrtc] Draining ${iceCandidateQueue.length} queued ICE candidate(s)`);
+    const candidates = [...iceCandidateQueue];
+    iceCandidateQueue = [];
+
+    for (const candidate of candidates) {
+        try {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+            console.warn("[webrtc] Failed to add queued ICE candidate:", err);
+        }
+    }
+}
+
+export async function createOffer(options?: { iceRestart?: boolean }): Promise<RTCSessionDescriptionInit> {
+    if (!peerConnection) {
+        if (savedCallbacks) {
+            createPeerConnection(savedLocalStream, savedCallbacks);
+        } else {
+            throw new Error("No peer connection available to create offer");
+        }
+    }
+
+    const offer = await peerConnection!.createOffer({
         iceRestart: options?.iceRestart ?? false,
         offerToReceiveVideo: true,
         offerToReceiveAudio: false,
     });
-    await peerConnection.setLocalDescription(offer);
+    await peerConnection!.setLocalDescription(offer);
     return offer;
 }
 
 export async function handleOffer(
     sdp: RTCSessionDescriptionInit
 ): Promise<void> {
-    if (!peerConnection) throw new Error("No peer connection");
+    if (!peerConnection) {
+        if (savedCallbacks) {
+            createPeerConnection(savedLocalStream, savedCallbacks);
+        } else {
+            throw new Error("No peer connection available to handle offer");
+        }
+    }
 
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+    await peerConnection!.setRemoteDescription(new RTCSessionDescription(sdp));
+    await drainIceCandidates();
 }
 
 export async function createAnswer(): Promise<RTCSessionDescriptionInit> {
-    if (!peerConnection) throw new Error("No peer connection");
+    if (!peerConnection) throw new Error("No peer connection available to create answer");
 
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
@@ -102,15 +141,20 @@ export async function createAnswer(): Promise<RTCSessionDescriptionInit> {
 export async function handleAnswer(
     sdp: RTCSessionDescriptionInit
 ): Promise<void> {
-    if (!peerConnection) throw new Error("No peer connection");
+    if (!peerConnection) throw new Error("No peer connection available to handle answer");
 
     await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+    await drainIceCandidates();
 }
 
 export async function addIceCandidate(
     candidate: RTCIceCandidateInit
 ): Promise<void> {
-    if (!peerConnection) return;
+    // If peer connection or remote description is not set yet, buffer candidate
+    if (!peerConnection || !peerConnection.remoteDescription || !peerConnection.remoteDescription.type) {
+        iceCandidateQueue.push(candidate);
+        return;
+    }
 
     try {
         await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
@@ -120,6 +164,7 @@ export async function addIceCandidate(
 }
 
 export function closePeerConnection() {
+    iceCandidateQueue = [];
     if (peerConnection) {
         peerConnection.ontrack = null;
         peerConnection.onicecandidate = null;
@@ -140,6 +185,7 @@ export function getPeerConnection(): RTCPeerConnection | null {
 }
 
 export async function replaceLocalStream(newStream: MediaStream) {
+    savedLocalStream = newStream;
     if (!peerConnection) return;
 
     const videoTrack = newStream.getVideoTracks()[0];

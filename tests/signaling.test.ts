@@ -157,26 +157,34 @@ async function runTests() {
             throw new Error("Partner status was not relayed to peer");
         }
 
-        // Test 8: Reconnection request
+        // Test 8: Reconnection request & synchronized peer reset
         console.log("\n[Test 8] Request reconnect from Client 2");
         let socket1ReceivedPartnerReconnecting = false;
-        let socket1ReceivedIceRestartOffer = false;
+        let socket1ReceivedResetPeer = false;
+        let socket2ReceivedResetPeer = false;
+        let socket1ReceivedFreshOffer = false;
 
         socket1.on("partner-reconnecting", () => {
             console.log("Socket 1 received partner-reconnecting!");
             socket1ReceivedPartnerReconnecting = true;
         });
+        socket1.on("reset-peer-connection", () => {
+            console.log("Socket 1 received reset-peer-connection!");
+            socket1ReceivedResetPeer = true;
+        });
+        socket2.on("reset-peer-connection", () => {
+            console.log("Socket 2 received reset-peer-connection!");
+            socket2ReceivedResetPeer = true;
+        });
         socket1.on("create-offer", (options) => {
-            if (options?.iceRestart) {
-                console.log("Socket 1 received create-offer with iceRestart=true!");
-                socket1ReceivedIceRestartOffer = true;
-            }
+            console.log("Socket 1 received create-offer after reset:", options);
+            socket1ReceivedFreshOffer = true;
         });
 
         socket2.emit("request-reconnect");
         await sleep(1000);
-        if (!socket1ReceivedPartnerReconnecting || !socket1ReceivedIceRestartOffer) {
-            throw new Error("request-reconnect did not trigger iceRestart offer to host");
+        if (!socket1ReceivedPartnerReconnecting || !socket1ReceivedResetPeer || !socket2ReceivedResetPeer || !socket1ReceivedFreshOffer) {
+            throw new Error("request-reconnect did not trigger synchronized peer reset and offer generation");
         }
 
         // Test 9: User 2 navigates back / disconnects. Verify room capacity updates

@@ -63,6 +63,8 @@ import {
     sendDeviceStatus,
     requestReconnect,
     disconnectSignaling,
+    isSignalingConnected,
+    reconnectSignaling,
 } from "@/lib/signaling";
 import {
     createPeerConnection,
@@ -566,7 +568,7 @@ export default function BoothRoomPage() {
         try {
             // 1. Verify or restart local camera stream if stopped or has ended tracks
             let stream = localStreamRef.current;
-            const isStreamDead = !stream || stream.getVideoTracks().some((t) => t.readyState === "ended" || !t.enabled);
+            const isStreamDead = !stream || stream.getVideoTracks().length === 0 || stream.getVideoTracks().some((t) => t.readyState === "ended" || !t.enabled);
 
             if (isStreamDead) {
                 console.log("[reconnect] Local video track not alive, re-initializing camera...");
@@ -585,24 +587,24 @@ export default function BoothRoomPage() {
                     sendDeviceStatus({ cameraStatus: parsed.type, message: parsed.message });
                     throw camErr;
                 }
+            } else if (stream) {
+                // Ensure tracks are enabled
+                stream.getVideoTracks().forEach((t) => (t.enabled = true));
+                sendDeviceStatus({ cameraStatus: "ready" });
             }
 
-            // 2. Request reconnect from signaling server to notify partner
-            requestReconnect();
+            // 2. Ensure WebSocket signaling connection is alive and joined to room
+            if (!isSignalingConnected()) {
+                console.log("[reconnect] Signaling socket not connected, re-establishing...");
+                reconnectSignaling(roomId);
+                await new Promise((resolve) => setTimeout(resolve, 350));
+            }
 
-            // 3. Reset peer connection state and trigger renegotiation with ICE restart
+            // 3. Reset local WebRTC peer connection immediately
             setPcTrigger((prev) => prev + 1);
 
-            // 4. If we are host and partner is present, immediately create offer with iceRestart
-            if (useBoothStore.getState().isHost && partnerConnected) {
-                try {
-                    console.log("[reconnect] Host creating offer with iceRestart...");
-                    const offer = await rtcCreateOffer({ iceRestart: true });
-                    sendOffer(offer);
-                } catch (e) {
-                    console.log("[reconnect] Offer handled during peer connection recreation:", e);
-                }
-            }
+            // 4. Request reconnect from signaling server (prompts both peers to reset & host to create-offer)
+            requestReconnect();
 
             // 5. Re-sync all state
             if (partnerConnected) {
@@ -627,7 +629,7 @@ export default function BoothRoomPage() {
                 setIsReconnecting(false);
             }, 1000);
         }
-    }, [isReconnecting, facingMode, partnerConnected, setIsReconnecting, setLocalStream]);
+    }, [isReconnecting, facingMode, partnerConnected, roomId, setIsReconnecting, setLocalStream]);
 
     // Handle mobile tab switching (visibility change): auto-recover frozen streams
     useEffect(() => {
@@ -779,6 +781,10 @@ export default function BoothRoomPage() {
                 closePeerConnection();
                 setPcTrigger((prev) => prev + 1);
             },
+            onResetPeerConnection: () => {
+                console.log("[booth] Received reset-peer-connection from signaling server");
+                setPcTrigger((prev) => prev + 1);
+            },
             onPartnerStatus: (status) => {
                 console.log("[booth] Partner device status received:", status);
                 setPartnerDeviceStatus(status as PartnerDeviceStatus);
@@ -857,14 +863,10 @@ export default function BoothRoomPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [roomId]);
 
-    // WebRTC: create peer connection when local stream is ready or trigger changes
-    const isStreamReady = !!localStream;
-
+    // WebRTC: create peer connection on mount or when trigger changes
     useEffect(() => {
-        if (!isStreamReady) return;
-
         console.log("[booth] Setting up WebRTC connection (trigger:", pcTrigger, ")...");
-        createPeerConnection(localStream, {
+        createPeerConnection(localStreamRef.current, {
             onRemoteStream: (stream) => {
                 console.log("[booth] Remote stream received");
                 setRemoteStream(stream);
@@ -891,7 +893,14 @@ export default function BoothRoomPage() {
             setRemoteStream(null);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isStreamReady, pcTrigger]);
+    }, [pcTrigger]);
+
+    // Whenever localStream updates, attach tracks to WebRTC peer connection
+    useEffect(() => {
+        if (localStream) {
+            replaceLocalStream(localStream);
+        }
+    }, [localStream]);
 
     // Manage camera during phase changes
     useEffect(() => {

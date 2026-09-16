@@ -7,6 +7,8 @@ const ICE_SERVERS: RTCIceServer[] = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
     { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
+    { urls: "stun:stun4.l.google.com:19302" },
 ];
 
 let peerConnection: RTCPeerConnection | null = null;
@@ -24,7 +26,10 @@ export function createPeerConnection(
     // Close existing connection if any
     closePeerConnection();
 
-    peerConnection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    peerConnection = new RTCPeerConnection({
+        iceServers: ICE_SERVERS,
+        iceCandidatePoolSize: 2,
+    });
 
     // Add local tracks to the connection
     localStream.getTracks().forEach((track) => {
@@ -56,16 +61,24 @@ export function createPeerConnection(
     };
 
     peerConnection.oniceconnectionstatechange = () => {
-        console.log("[webrtc] ICE state:", peerConnection?.iceConnectionState);
+        const iceState = peerConnection?.iceConnectionState;
+        console.log("[webrtc] ICE state:", iceState);
+        if (iceState === "failed" || iceState === "disconnected") {
+            console.warn("[webrtc] ICE connection degraded/failed:", iceState);
+        }
     };
 
     return peerConnection;
 }
 
-export async function createOffer(): Promise<RTCSessionDescriptionInit> {
+export async function createOffer(options?: { iceRestart?: boolean }): Promise<RTCSessionDescriptionInit> {
     if (!peerConnection) throw new Error("No peer connection");
 
-    const offer = await peerConnection.createOffer();
+    const offer = await peerConnection.createOffer({
+        iceRestart: options?.iceRestart ?? false,
+        offerToReceiveVideo: true,
+        offerToReceiveAudio: false,
+    });
     await peerConnection.setLocalDescription(offer);
     return offer;
 }
@@ -112,7 +125,11 @@ export function closePeerConnection() {
         peerConnection.onicecandidate = null;
         peerConnection.onconnectionstatechange = null;
         peerConnection.oniceconnectionstatechange = null;
-        peerConnection.close();
+        try {
+            peerConnection.close();
+        } catch (err) {
+            console.warn("[webrtc] Error closing peer connection:", err);
+        }
         peerConnection = null;
         console.log("[webrtc] Peer connection closed");
     }
@@ -126,15 +143,28 @@ export async function replaceLocalStream(newStream: MediaStream) {
     if (!peerConnection) return;
 
     const videoTrack = newStream.getVideoTracks()[0];
+    if (!videoTrack) return;
+
     const senders = peerConnection.getSenders();
     const sender = senders.find((s) => s.track?.kind === "video");
 
-    if (sender && videoTrack) {
+    if (sender) {
         try {
             await sender.replaceTrack(videoTrack);
+            console.log("[webrtc] Replaced video track with new stream");
         } catch (err) {
             console.error("[webrtc] Failed to replace video track:", err);
+        }
+    } else {
+        try {
+            peerConnection.addTrack(videoTrack, newStream);
+            console.log("[webrtc] Added new video track to peer connection");
+        } catch (err) {
+            console.error("[webrtc] Failed to add new video track:", err);
         }
     }
 }
 
+export function isPeerConnected(): boolean {
+    return peerConnection?.connectionState === "connected";
+}

@@ -1,6 +1,6 @@
 # LoveLens Documentation 💕
 
-LoveLens is a high-performance, real-time virtual photobooth designed for long-distance couples. This document provides a technical deep-dive into its architecture, WebRTC implementation, and operational workflows.
+LoveLens is a high-performance, real-time virtual photobooth designed for long-distance couples. This document provides a technical deep-dive into its architecture, WebRTC implementation, connection recovery, and operational workflows.
 
 ---
 
@@ -30,6 +30,12 @@ npm run dev
 - **Frontend:** `http://localhost:3000`
 - **Signaling Server:** `http://localhost:3001`
 
+### Running Automated Tests
+Run the automated end-to-end signaling and connection test suite:
+```bash
+npm test
+```
+
 ---
 
 ## 🏗️ Architecture Overview
@@ -38,14 +44,14 @@ LoveLens follows a hybrid architecture combining a modern React frontend with a 
 
 ### 1. Frontend (Next.js 16 + React 19)
 - **App Router:** Utilizes Next.js App Router for optimized routing (`/booth`, `/booth/[roomId]`).
-- **State Management:** Powered by **Zustand** (`src/stores/booth-store.ts`) for managing the booth lifecycle, camera streams, and capture synchronization.
+- **State Management:** Powered by **Zustand** (`src/stores/booth-store.ts`) for managing the booth lifecycle, camera streams, device statuses, and capture synchronization.
 - **Styling:** **Tailwind CSS 4** with CSS variables for dynamic theming (Dark, Pink, Light).
-- **Animations:** **Framer Motion** for smooth transitions, countdowns, and "flash" effects.
+- **Animations:** **Framer Motion** for smooth transitions, countdowns, toasts, and "flash" effects.
 
 ### 2. Signaling Server (Node.js + Socket.IO)
-- **Role:** Facilitates the WebRTC handshake (SDP exchange) and synchronizes photo-taking events.
-- **Room Management:** A simple in-memory Map handles room codes and member counts (max 2 per room).
-- **HTTP API:** Provides endpoints for room creation and status checks (`/api/rooms`).
+- **Role:** Facilitates the WebRTC handshake (SDP exchange), synchronizes photo-taking events, and broadcasts real-time device health.
+- **Room Management & 5-Minute Grace Period:** Tracks participants by stable `clientId` and active connection state. Rooms persist with a 5-minute grace period when both users disconnect before automated pruning, preventing premature room destruction.
+- **HTTP API:** Provides endpoints for room creation and active status checks (`/api/rooms`).
 
 ---
 
@@ -54,14 +60,23 @@ LoveLens follows a hybrid architecture combining a modern React frontend with a 
 WebRTC (Web Real-Time Communication) allows the two partners to stream video directly to each other (Peer-to-Peer) without routing heavy video data through a server.
 
 ### The Handshake Process (Signaling)
-1. **Connection:** Both users connect to the signaling server via WebSockets (Socket.IO).
+1. **Connection:** Both users connect to the signaling server via WebSockets (Socket.IO) with persistent client identifiers.
 2. **Offer:** The first user in the room (Host) creates an **SDP Offer** and sends it to the partner through the signaling server.
 3. **Answer:** The partner receives the Offer, sets it as their "Remote Description," creates an **SDP Answer**, and sends it back.
 4. **ICE Candidates:** Both peers exchange "ICE Candidates" (network path options) to find the best way to connect through firewalls or NATs.
 5. **Direct Stream:** Once the handshake is complete, the `RTCPeerConnection` is established, and video tracks are exchanged directly.
 
-### STUN Servers
-LoveLens uses Google's public STUN servers (`stun.l.google.com:19302`) to discover the public IP addresses of the peers, ensuring connectivity even behind most home routers.
+### 🔄 Connection Recovery & Stream Refresh
+- **One-Click Refresh:** When users click "Refresh", the client re-verifies local media tracks, issues a `request-reconnect` signal, and prompts the host to perform an ICE restart (`createOffer({ iceRestart: true })`).
+- **Mobile Tab Recovery:** A `visibilitychange` listener detects when users switch back to the browser tab, automatically repairing frozen media streams.
+
+### 📱 Mobile Camera Switching
+- **Front & Back Cameras:** Supports flipping between selfie (`facingMode: "user"`) and environment cameras (`facingMode: "environment"`).
+- **Dynamic Mirroring:** Front camera feeds are horizontally mirrored for natural posing, while rear camera feeds remain un-mirrored.
+- **Track Replacement:** Media tracks are seamlessly swapped via `RTCRtpSender.replaceTrack` without dropping the peer connection.
+
+### ⚠️ Cross-Peer Status Syncing
+- If a partner blocks camera permissions, experiences device conflicts, or is reconnecting, a real-time `device-status` socket event is broadcast to display contextual advisory banners on the other peer's screen.
 
 ---
 
@@ -104,4 +119,4 @@ Set the environment variable:
 ## 🔒 Security & Privacy
 - **No Storage:** LoveLens does not store images on any server. All photo processing and photostrip generation happen in the user's browser.
 - **P2P Video:** Video streams are encrypted and sent directly between peers via WebRTC.
-- **Ephemeral Rooms:** Rooms are destroyed automatically when both users disconnect.
+- **5-Minute Grace Period & Safe Pruning:** Booths are preserved for 5 minutes after both users disconnect to allow effortless re-entry and reload recovery, after which rooms are cleanly purged from memory.

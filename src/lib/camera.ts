@@ -1,6 +1,6 @@
 /**
  * LoveLens — Camera utility functions
- * Handles getUserMedia, frame capture, and stream management
+ * Handles getUserMedia, frame capture, mobile camera switching, and stream management
  */
 
 export interface CameraConfig {
@@ -10,12 +10,77 @@ export interface CameraConfig {
     frameRate?: number;
 }
 
-const DEFAULT_CONFIG: CameraConfig = {
-    width: 1280,
-    height: 720,
-    facingMode: "user",
-    frameRate: 30,
-};
+export type CameraErrorType = "permission_denied" | "not_found" | "in_use" | "error";
+
+export interface CameraException {
+    type: CameraErrorType;
+    message: string;
+}
+
+export function parseCameraError(error: unknown): CameraException {
+    if (error instanceof DOMException) {
+        switch (error.name) {
+            case "NotAllowedError":
+            case "PermissionDeniedError":
+                return {
+                    type: "permission_denied",
+                    message: "Camera permission denied. Please allow camera access in your browser settings.",
+                };
+            case "NotFoundError":
+            case "DevicesNotFoundError":
+                return {
+                    type: "not_found",
+                    message: "No camera found. Please connect or enable a camera.",
+                };
+            case "NotReadableError":
+            case "TrackStartError":
+                return {
+                    type: "in_use",
+                    message: "Camera is already in use by another application or tab.",
+                };
+            default:
+                return {
+                    type: "error",
+                    message: `Camera error: ${error.message}`,
+                };
+        }
+    }
+    return {
+        type: "error",
+        message: error instanceof Error ? error.message : "Failed to access camera",
+    };
+}
+
+export function isMobileDevice(): boolean {
+    if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+    const ua = navigator.userAgent || "";
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    const isIPadOS = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+    const hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    return isMobileUA || isIPadOS || (hasTouch && window.innerWidth <= 1024);
+}
+
+export async function getAvailableCameras(): Promise<{
+    hasMultiple: boolean;
+    devices: MediaDeviceInfo[];
+    isMobile: boolean;
+}> {
+    const isMobile = isMobileDevice();
+    try {
+        if (!navigator.mediaDevices?.enumerateDevices) {
+            return { hasMultiple: isMobile, devices: [], isMobile };
+        }
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices.filter((d) => d.kind === "videoinput");
+        return {
+            hasMultiple: videoInputs.length > 1 || isMobile,
+            devices: videoInputs,
+            isMobile,
+        };
+    } catch {
+        return { hasMultiple: isMobile, devices: [], isMobile };
+    }
+}
 
 export async function initCamera(
     config: CameraConfig = {}
@@ -23,46 +88,57 @@ export async function initCamera(
     const isPortrait = typeof window !== "undefined" && window.innerHeight > window.innerWidth;
     const defaultWidth = isPortrait ? 720 : 1280;
     const defaultHeight = isPortrait ? 1280 : 720;
-    
-    const mergedConfig = { width: defaultWidth, height: defaultHeight, facingMode: "user", frameRate: 30, ...config };
+
+    const mergedConfig = {
+        width: defaultWidth,
+        height: defaultHeight,
+        facingMode: "user" as const,
+        frameRate: 30,
+        ...config,
+    };
+
+    const videoConstraints: MediaTrackConstraints = {
+        width: { ideal: mergedConfig.width },
+        height: { ideal: mergedConfig.height },
+        frameRate: { ideal: mergedConfig.frameRate },
+    };
+
+    if (mergedConfig.facingMode) {
+        videoConstraints.facingMode = { ideal: mergedConfig.facingMode };
+    }
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                width: { ideal: mergedConfig.width },
-                height: { ideal: mergedConfig.height },
-                facingMode: mergedConfig.facingMode,
-                frameRate: { ideal: mergedConfig.frameRate },
-            },
+            video: videoConstraints,
             audio: false,
         });
         return stream;
     } catch (error) {
-        if (error instanceof DOMException) {
-            switch (error.name) {
-                case "NotAllowedError":
-                    throw new Error(
-                        "Camera permission denied. Please allow camera access to use the booth."
-                    );
-                case "NotFoundError":
-                    throw new Error(
-                        "No camera found. Please connect a camera and try again."
-                    );
-                case "NotReadableError":
-                    throw new Error(
-                        "Camera is already in use by another application."
-                    );
-                default:
-                    throw new Error(`Camera error: ${error.message}`);
+        // Fallback with loose constraints if ideal constraints failed on specific mobile devices
+        if (error instanceof DOMException && error.name !== "NotAllowedError") {
+            try {
+                return await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: false,
+                });
+            } catch {
+                // fall through
             }
         }
-        throw error;
+        const parsed = parseCameraError(error);
+        throw new Error(parsed.message);
     }
 }
 
 export function stopStream(stream: MediaStream | null) {
     if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+        stream.getTracks().forEach((track) => {
+            try {
+                track.stop();
+            } catch (err) {
+                console.warn("Failed to stop track:", err);
+            }
+        });
     }
 }
 
@@ -89,7 +165,7 @@ export function captureFrame(
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.scale(mirrored ? -zoom : zoom, zoom);
     ctx.translate(-canvas.width / 2, -canvas.height / 2);
-    
+
     ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
     ctx.restore();
 
